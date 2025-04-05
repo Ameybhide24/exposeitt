@@ -70,9 +70,29 @@ const CreatePost = () => {
         setActiveStep((prevStep) => prevStep - 1);
     };
 
-    const handleEnhanceWithAI = () => {
-        // TODO: Implement Gemini API integration
-        console.log('Enhancing with AI...');
+     const handleEnhanceWithAI = () => {
+        try {
+            console.log('Enhancing with AI...');
+    
+            // Prepare the data to send in the request body
+            // Replace with actual data that you want to send
+            const postData = {
+                title: title,
+                description: content,
+                category: category,
+                location: location,
+            };
+    
+            // Call the Generate Post API
+            const response =  axios.post('http://localhost:9000/api/posts/generate', postData);
+            
+            // Handle the response
+            console.log('Post created successfully:', response.data);
+    
+        } catch (error) {
+            console.error('Error creating post:', error); // Error handling
+        }
+ 
     };
 
     const handleSubmit = async (e) => {
