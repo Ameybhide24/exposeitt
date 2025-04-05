@@ -26,10 +26,30 @@ const postSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+    userId: {
+        type: String,
+        required: true,
+        ref: 'User'
+    },
+    authorName: {
+        type: String,
+        required: true,
+        set: function(name) {
+            return CryptoJS.AES.encrypt(name, process.env.ENCRYPTION_KEY).toString();
+        },
+        get: function(name) {
+            return CryptoJS.AES.decrypt(name, process.env.ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+        }
+    },
+    authorEmail: {
+        type: String,
+        required: true,
+        set: function(email) {
+            return CryptoJS.AES.encrypt(email, process.env.ENCRYPTION_KEY).toString();
+        },
+        get: function(email) {
+            return CryptoJS.AES.decrypt(email, process.env.ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+        }
     },
     createdAt: {
         type: Date,
@@ -37,17 +57,13 @@ const postSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'approved', 'rejected'],
-        default: 'pending'
+        enum: ['posted', 'reported'],
+        default: 'posted'
     }
 }, {
+    timestamps: true,
     toJSON: { getters: true },
     toObject: { getters: true }
 });
-
-// Index for faster queries
-postSchema.index({ user: 1 });
-postSchema.index({ status: 1 });
-postSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema); 

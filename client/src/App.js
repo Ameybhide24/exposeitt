@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+import { Auth0Provider } from '@auth0/auth0-react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import axios from 'axios';
 import { auth0Config } from './auth0-config';
 
 import Navbar from './components/Navbar';
@@ -24,40 +23,6 @@ const theme = createTheme({
     },
 });
 
-// Wrapper component to handle user sync
-const AuthWrapper = ({ children }) => {
-    const { isAuthenticated, getAccessTokenSilently, user } = useAuth0();
-
-    useEffect(() => {
-        const syncUser = async () => {
-            if (isAuthenticated && user) {
-                try {
-                    const token = await getAccessTokenSilently();
-                    await axios.post('http://localhost:5050/api/users/sync', 
-                        {
-                            sub: user.sub,
-                            email: user.email,
-                            name: user.name,
-                            picture: user.picture
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`
-                            }
-                        }
-                    );
-                } catch (error) {
-                    console.error('Error syncing user:', error);
-                }
-            }
-        };
-
-        syncUser();
-    }, [isAuthenticated, user, getAccessTokenSilently]);
-
-    return children;
-};
-
 function App() {
     return (
         <Auth0Provider
@@ -66,6 +31,7 @@ function App() {
             authorizationParams={{
                 redirect_uri: auth0Config.redirectUri,
                 audience: auth0Config.audience,
+                scope: 'openid profile email'
             }}
             useRefreshTokens={true}
             cacheLocation="localstorage"
@@ -73,15 +39,13 @@ function App() {
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 <Router>
-                    <AuthWrapper>
-                        <Navbar />
-                        <Routes>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/create-post" element={<CreatePost />} />
-                            <Route path="/posts" element={<PostList />} />
-                        </Routes>
-                    </AuthWrapper>
+                    <Navbar />
+                    <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/create-post" element={<CreatePost />} />
+                        <Route path="/posts" element={<PostList />} />
+                    </Routes>
                 </Router>
             </ThemeProvider>
         </Auth0Provider>

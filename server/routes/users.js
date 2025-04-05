@@ -1,84 +1,88 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { expressjwt: jwt } = require('express-jwt');
-const jwks = require('jwks-rsa');
+const { auth } = require('express-oauth2-jwt-bearer');
 
-const jwtCheck = jwt({
-    secret: jwks.expressJwtSecret({
-        cache: true,
-        rateLimit: true,
-        jwksRequestsPerMinute: 5,
-        jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`
-    }),
+// Auth0 middleware
+const checkJwt = auth({
     audience: process.env.AUTH0_AUDIENCE,
-    issuer: `https://${process.env.AUTH0_DOMAIN}/`,
-    algorithms: ['RS256']
+    issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}/`,
 });
 
-// Create or update user on login/signup
-router.post('/sync', jwtCheck, async (req, res) => {
+// Create or update user
+router.post('/', checkJwt, async (req, res) => {
     try {
-        const { sub, email, name, picture } = req.body;
+        const { email, name, picture } = req.body;
+        const auth0Id = req.auth?.payload?.sub;
 
-        // Try to find existing user
-        let user = await User.findOne({ auth0Id: sub });
+        console.log('Received user creation request:');
+        console.log('Auth token data:', req.auth);
+        console.log('Auth0 ID from token:', auth0Id);
+        console.log('Request body:', { email, name, picture });
 
-        if (user) {
-            // Update existing user
-            user.lastLogin = new Date();
-            if (email) user.email = email;
-            if (name) user.name = name;
-            if (picture) user.picture = picture;
-            await user.save();
-        } else {
-            // Create new user
-            user = new User({
-                auth0Id: sub,
+        if (!auth0Id) {
+            console.error('No auth0Id found in token');
+            return res.status(400).json({ 
+                message: 'Invalid token: Auth0 ID is required',
+                tokenData: req.auth
+            });
+        }
+
+        const user = await User.findOneAndUpdate(
+            { auth0Id },
+            {
+                auth0Id,
                 email,
                 name,
-                picture
-            });
-            await user.save();
-        }
+                picture,
+                lastLogin: new Date()
+            },
+            { 
+                upsert: true, 
+                new: true,
+                runValidators: true,
+                setDefaultsOnInsert: true
+            }
+        );
 
+        console.log('User created/updated successfully:', user);
         res.json(user);
     } catch (err) {
-        console.error('Error syncing user:', err);
-        res.status(500).json({ message: 'Error syncing user data' });
+        console.error('Detailed error in user creation:', err);
+        console.error('Stack trace:', err.stack);
+        res.status(500).json({ 
+            message: 'Error creating/updating user',
+            error: err.message,
+            details: err.errors,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
     }
 });
 
-// Get user profile
-router.get('/profile', jwtCheck, async (req, res) => {
+// Get current user
+router.get('/me', checkJwt, async (req, res) => {
     try {
-        const user = await User.findOne({ auth0Id: req.auth.sub })
-            .populate('posts');
-        
+        const auth0Id = req.auth?.payload?.sub;
+        console.log('Fetching user profile for:', auth0Id);
+
+        if (!auth0Id) {
+            return res.status(400).json({ message: 'Invalid token: Auth0 ID is required' });
+        }
+
+        const user = await User.findOne({ auth0Id });
         if (!user) {
+            console.log('User not found:', auth0Id);
             return res.status(404).json({ message: 'User not found' });
         }
 
+        console.log('User found:', user);
         res.json(user);
     } catch (err) {
-        res.status(500).json({ message: 'Error fetching user profile' });
-    }
-});
-
-// Get user's posts
-router.get('/posts', jwtCheck, async (req, res) => {
-    try {
-        const user = await User.findOne({ auth0Id: req.auth.sub });
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const posts = await Post.find({ user: user._id })
-            .sort({ createdAt: -1 });
-        
-        res.json(posts);
-    } catch (err) {
-        res.status(500).json({ message: 'Error fetching user posts' });
+        console.error('Error fetching user:', err);
+        res.status(500).json({ 
+            message: 'Error fetching user',
+            error: err.message 
+        });
     }
 });
 

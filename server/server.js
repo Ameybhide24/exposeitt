@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { expressjwt: jwt } = require('express-jwt');
-const jwks = require('jwks-rsa');
+const { auth } = require('express-oauth2-jwt-bearer');
 require('dotenv').config();
 
 const postsRouter = require('./routes/posts');
@@ -19,23 +18,13 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 // Auth0 JWT verification
-const jwtCheck = jwt({
-    secret: jwks.expressJwtSecret({
-        cache: true,
-        rateLimit: true,
-        jwksRequestsPerMinute: 5,
-        jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`
-    }),
+const checkJwt = auth({
     audience: process.env.AUTH0_AUDIENCE,
-    issuer: `https://${process.env.AUTH0_DOMAIN}/`,
-    algorithms: ['RS256']
+    issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}/`,
 });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('MongoDB connection error:', err));
 
@@ -47,17 +36,30 @@ app.get('/api/public', (req, res) => {
     res.json({ message: 'Public endpoint' });
 });
 
-app.get('/api/private', jwtCheck, (req, res) => {
+app.get('/api/private', checkJwt, (req, res) => {
     res.json({ message: 'Private endpoint' });
 });
 
 // Error handling
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Detailed error:', err);
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+
     if (err.name === 'UnauthorizedError') {
-        return res.status(401).json({ message: 'Invalid token' });
+        return res.status(401).json({ 
+            message: 'Invalid token',
+            error: err.message,
+            code: err.code
+        });
     }
-    res.status(500).json({ message: 'Something went wrong!' });
+
+    res.status(500).json({ 
+        message: 'Something went wrong!',
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });
 
 const PORT = process.env.PORT || 5050;

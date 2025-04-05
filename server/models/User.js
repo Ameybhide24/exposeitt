@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const CryptoJS = require('crypto-js');
 
 const userSchema = new mongoose.Schema({
     auth0Id: {
@@ -9,31 +10,49 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true
+        get: function(email) {
+            try {
+                const bytes = CryptoJS.AES.decrypt(email, process.env.ENCRYPTION_KEY);
+                return bytes.toString(CryptoJS.enc.Utf8);
+            } catch (err) {
+                return email;
+            }
+        },
+        set: function(email) {
+            return CryptoJS.AES.encrypt(email, process.env.ENCRYPTION_KEY).toString();
+        }
     },
     name: {
         type: String,
-        required: true
+        required: true,
+        get: function(name) {
+            try {
+                const bytes = CryptoJS.AES.decrypt(name, process.env.ENCRYPTION_KEY);
+                return bytes.toString(CryptoJS.enc.Utf8);
+            } catch (err) {
+                return name;
+            }
+        },
+        set: function(name) {
+            return CryptoJS.AES.encrypt(name, process.env.ENCRYPTION_KEY).toString();
+        }
     },
     picture: {
-        type: String
-    },
-    lastLogin: {
-        type: Date,
-        default: Date.now
+        type: String,
+        required: false
     },
     createdAt: {
         type: Date,
         default: Date.now
     },
-    posts: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Post'
-    }]
+    lastLogin: {
+        type: Date,
+        default: Date.now
+    }
+}, {
+    timestamps: true,
+    toJSON: { getters: true },
+    toObject: { getters: true }
 });
-
-// Index for faster queries
-userSchema.index({ auth0Id: 1 });
-userSchema.index({ email: 1 });
 
 module.exports = mongoose.model('User', userSchema); 
