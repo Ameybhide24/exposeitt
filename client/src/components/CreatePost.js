@@ -29,6 +29,8 @@ import SecurityIcon from '@mui/icons-material/Security';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PublishIcon from '@mui/icons-material/Publish';
+import CheckIcon from '@mui/icons-material/Check';
+import EditIcon from '@mui/icons-material/Edit';
 
 const categories = [
     { value: 'Workplace Issues', icon: '🏢', description: 'Report workplace harassment, discrimination, or safety concerns' },
@@ -39,7 +41,7 @@ const categories = [
     { value: 'Other', icon: '📝', description: 'Other concerns not covered by the categories above' },
 ];
 
-const steps = ['Basic Information', 'Event Details', 'Review & Submit'];
+const steps = ['Basic Information', 'Event Details', 'Review Post', 'Final Review'];
 
 const CreatePost = () => {
     const [activeStep, setActiveStep] = useState(0);
@@ -49,6 +51,8 @@ const CreatePost = () => {
     const [location, setLocation] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [aiEnhancedPost, setAiEnhancedPost] = useState(null);
+    const [isEditingEnhanced, setIsEditingEnhanced] = useState(false);
     const { getAccessTokenSilently, user } = useAuth0();
     const navigate = useNavigate();
     const theme = useTheme();
@@ -70,12 +74,11 @@ const CreatePost = () => {
         setActiveStep((prevStep) => prevStep - 1);
     };
 
-     const handleEnhanceWithAI = () => {
+    const handleEnhanceWithAI = async () => {
         try {
             console.log('Enhancing with AI...');
+            setIsSubmitting(true);
     
-            // Prepare the data to send in the request body
-            // Replace with actual data that you want to send
             const postData = {
                 title: title,
                 description: content,
@@ -83,16 +86,18 @@ const CreatePost = () => {
                 location: location,
             };
     
-            // Call the Generate Post API
-            const response =  axios.post('http://localhost:9000/api/posts/generate', postData);
-            
-            // Handle the response
-            console.log('Post created successfully:', response.data);
+            const response = await axios.post('http://localhost:9000/api/posts/generate', postData);
+            setAiEnhancedPost(response.data.post);
+            setIsEditingEnhanced(false);
+            setActiveStep(3); // Move to Final Review step
+            console.log('Post enhanced successfully:', response.data);
     
         } catch (error) {
-            console.error('Error creating post:', error); // Error handling
+            console.error('Error enhancing post:', error);
+            setError('Failed to enhance post with AI. Please try again.');
+        } finally {
+            setIsSubmitting(false);
         }
- 
     };
 
     const handleSubmit = async (e) => {
@@ -265,7 +270,7 @@ const CreatePost = () => {
                     <Box sx={{ mt: 3 }}>
                         <Card sx={{ mb: 3, backgroundColor: 'rgba(31, 53, 199, 0.04)' }}>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom>Report Summary</Typography>
+                                <Typography variant="h6" gutterBottom>Your Report</Typography>
                                 <Divider sx={{ mb: 2 }} />
                                 
                                 <Typography variant="subtitle2" color="primary">Category</Typography>
@@ -278,7 +283,7 @@ const CreatePost = () => {
                                 <Typography paragraph>{location}</Typography>
                                 
                                 <Typography variant="subtitle2" color="primary">Details</Typography>
-                                <Typography>{content}</Typography>
+                                <Typography paragraph>{content}</Typography>
                             </CardContent>
                         </Card>
                         
@@ -287,13 +292,163 @@ const CreatePost = () => {
                                 variant="outlined"
                                 startIcon={<SmartToyIcon />}
                                 onClick={handleEnhanceWithAI}
+                                disabled={isSubmitting}
                                 sx={{
                                     borderRadius: 2,
                                     px: 3,
                                 }}
                             >
-                                Enhance with AI
+                                {isSubmitting ? (
+                                    <CircularProgress size={24} color="inherit" />
+                                ) : (
+                                    'Enhance with AI'
+                                )}
                             </Button>
+                        </Box>
+                    </Box>
+                );
+            case 3:
+                return (
+                    <Box sx={{ mt: 3 }}>
+                        <Card sx={{ mb: 3, backgroundColor: 'rgba(31, 53, 199, 0.04)' }}>
+                            <CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                    <Typography variant="h6">
+                                        {aiEnhancedPost ? 'AI Enhanced Report' : 'Your Report'}
+                                    </Typography>
+                                    <Button
+                                        variant="outlined"
+                                        onClick={() => setIsEditingEnhanced(!isEditingEnhanced)}
+                                        startIcon={isEditingEnhanced ? <CheckIcon /> : <EditIcon />}
+                                    >
+                                        {isEditingEnhanced ? 'Save Changes' : 'Edit'}
+                                    </Button>
+                                </Box>
+                                <Divider sx={{ mb: 2 }} />
+                                
+                                {aiEnhancedPost ? (
+                                    <>
+                                        <Typography variant="subtitle2" color="primary">Heading</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={aiEnhancedPost.heading}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, heading: e.target.value})}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{aiEnhancedPost.heading}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Category</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={aiEnhancedPost.category}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, category: e.target.value})}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{aiEnhancedPost.category}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Location & Time</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={aiEnhancedPost.locationTime}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, locationTime: e.target.value})}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{aiEnhancedPost.locationTime}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Summary</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                rows={3}
+                                                value={aiEnhancedPost.summary}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, summary: e.target.value})}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{aiEnhancedPost.summary}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Additional Information</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                rows={2}
+                                                value={aiEnhancedPost.additionalInfo}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, additionalInfo: e.target.value})}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography>{aiEnhancedPost.additionalInfo}</Typography>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Typography variant="subtitle2" color="primary">Category</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={category}
+                                                onChange={(e) => setCategory(e.target.value)}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{category}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Title</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={title}
+                                                onChange={(e) => setTitle(e.target.value)}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{title}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Location</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                value={location}
+                                                onChange={(e) => setLocation(e.target.value)}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{location}</Typography>
+                                        )}
+                                        
+                                        <Typography variant="subtitle2" color="primary">Details</Typography>
+                                        {isEditingEnhanced ? (
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                rows={4}
+                                                value={content}
+                                                onChange={(e) => setContent(e.target.value)}
+                                                sx={{ mb: 2 }}
+                                            />
+                                        ) : (
+                                            <Typography paragraph>{content}</Typography>
+                                        )}
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                        
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
                             <Button
                                 variant="contained"
                                 startIcon={<PublishIcon />}
@@ -377,7 +532,7 @@ const CreatePost = () => {
                         >
                             {activeStep === 0 ? 'Cancel' : 'Back'}
                         </Button>
-                        {activeStep < 2 && (
+                        {activeStep < 3 && (
                             <Button
                                 variant="contained"
                                 onClick={handleNext}
