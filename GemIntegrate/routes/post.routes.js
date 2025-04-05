@@ -6,10 +6,8 @@ const upload = multer({ dest: "uploads/" });
 const TranscriptionController = require('../controller/transcription.controller');
 
 
-
 router.post('/generate', (req, res) => {
-      
-      // Import controller here to avoid circular dependencies
+      console.log("inside this");
       PostController.generatePost(req, res);
 });
 

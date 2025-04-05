@@ -1,14 +1,16 @@
 const { textModel } = require('../config/gemini.config');
 
 class PostService {
-  static async generateSocialMediaPost(description) {
+  static async generateSocialMediaPost(body) {
+    console.log(body);
     const prompt = `
     Convert this crime report into a structured social media post with these EXACT sections:
     
-    1. heading: A short, attention-grabbing headline (include relevant emoji)
-    2. locationTime: Combine location (format: "📍 [location]") and time (format: "🕒 [time]") if available
-    3. summary: 2-3 sentence description of what happened
-    4. additionalInfo: Any safety advice or follow-up actions
+    1. heading: A short, attention-grabbing headline (include relevant emoji), take reference from ${body.title}
+    2. category: ${body.category}
+    3. locationTime: Combine location (format: "📍 [location]") and time (format: "🕒 [time]") if available in ${body.location}
+    4. summary: 2-3 sentence description of what happened
+    5. additionalInfo: Any safety advice or follow-up actions
     
     Return ONLY a RAW JSON object without any markdown formatting or additional text.
     Example:
@@ -19,7 +21,7 @@ class PostService {
       "additionalInfo": "Avoid the area and report any suspicious activity."
     }
 
-    Crime description: ${description}
+    Crime description: ${body.description}
     `;
 
     try {
