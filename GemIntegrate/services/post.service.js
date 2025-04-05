@@ -9,16 +9,14 @@ class PostService {
     1. title: A short, attention-grabbing headline (include relevant emoji), take reference from ${body.title}
     2. category: ${body.category}
     3. location: Combine location (format: "📍 [location]") and time (format: "🕒 [time]") if available in ${body.location}
-    4. content: 2-3 sentence description of what happened
-    5. additionalInfo: Any safety advice or follow-up actions
+    4. content: 2-3 sentence description of what happened. Add Any safety advice or follow-up actions.  Do NOT include any additional information beyond this.
     
     Return ONLY a RAW JSON object without any markdown formatting or additional text.
     Example:
     {
       "title": "🚨 Purse Snatching Reported",
       "location": "📍 Central Park 🕒 Yesterday at 5pm",
-      "content": "Two suspects in black jackets stole a woman's purse...",
-      "additionalInfo": "Avoid the area and report any suspicious activity."
+      "content": "Two suspects in black jackets stole a woman's purse..., Avoid the area and report any suspicious activity...",
     }
 
     Crime description: ${body.description}
