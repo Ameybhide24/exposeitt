@@ -10,6 +10,7 @@ import Home from './components/Home';
 import Dashboard from './components/Dashboard';
 import CreatePost from './components/CreatePost';
 import PostList from './components/PostList';
+import Feed from './components/Feed';
 
 const theme = createTheme({
     palette: {
@@ -45,6 +46,7 @@ function App() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/create-post" element={<CreatePost />} />
                         <Route path="/posts" element={<PostList />} />
+                        <Route path="/feed" element={<Feed />} />
                     </Routes>
                 </Router>
             </ThemeProvider>

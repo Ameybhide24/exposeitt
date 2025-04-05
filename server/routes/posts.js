@@ -2,11 +2,45 @@ const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
 const { auth } = require('express-oauth2-jwt-bearer');
+const crypto = require('crypto');
 
 // Auth0 middleware
 const checkJwt = auth({
     audience: process.env.AUTH0_AUDIENCE,
     issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}/`,
+});
+
+// Helper function to generate consistent anonymous ID
+const generateAnonymousId = (userId) => {
+    const hash = crypto.createHash('sha256').update(userId).digest('hex');
+    return hash.substring(0, 8); // Take first 8 characters for shorter ID
+};
+
+// Get feed (all posts with anonymized user data) - Public route
+router.get('/feed', async (req, res) => {
+    try {
+        console.log('Fetching feed posts');
+        const posts = await Post.find({})
+            .sort({ createdAt: -1 });
+
+        console.log(`Found ${posts.length} posts for feed`);
+
+        // Anonymize user data
+        const anonymizedPosts = posts.map(post => {
+            const anonymousId = generateAnonymousId(post.userId);
+            return {
+                ...post.toObject({ getters: true }),
+                authorName: `Anonymous User ${anonymousId}`,
+                authorEmail: undefined, // Remove email for privacy
+                userId: undefined // Remove actual userId for privacy
+            };
+        });
+
+        res.json(anonymizedPosts);
+    } catch (err) {
+        console.error('Error fetching feed:', err);
+        res.status(500).json({ message: err.message });
+    }
 });
 
 // Get all approved posts
@@ -24,13 +58,13 @@ router.get('/', async (req, res) => {
 // Create a new post
 router.post('/', checkJwt, async (req, res) => {
     try {
-        const { title, content, category, authorName, authorEmail } = req.body;
+        const { title, content, category, location, authorName, authorEmail } = req.body;
         const userId = req.auth?.payload?.sub;  // Access sub from payload
 
         console.log('Creating new post:');
         console.log('Auth token data:', req.auth);
         console.log('User ID from token:', userId);
-        console.log('Request body:', { title, category, authorName, authorEmail });
+        console.log('Request body:', { title, category, location, authorName, authorEmail });
 
         if (!userId) {
             return res.status(400).json({ 
@@ -43,6 +77,7 @@ router.post('/', checkJwt, async (req, res) => {
             title,
             content,
             category,
+            location,
             userId,
             authorName,
             authorEmail

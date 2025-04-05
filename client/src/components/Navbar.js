@@ -210,6 +210,22 @@ const Navbar = () => {
                                     </MenuItem>
                                     <MenuItem 
                                         component={RouterLink} 
+                                        to="/feed"
+                                        onClick={handleClose}
+                                        sx={{ 
+                                            color: 'var(--text-primary)',
+                                            borderRadius: '8px',
+                                            mx: 1,
+                                            my: 0.5,
+                                            '&:hover': {
+                                                background: 'rgba(31, 53, 199, 0.08)',
+                                            }
+                                        }}
+                                    >
+                                        Community Feed
+                                    </MenuItem>
+                                    <MenuItem 
+                                        component={RouterLink} 
                                         to="/create-post"
                                         onClick={handleClose}
                                         sx={{ 
@@ -261,10 +277,10 @@ const Navbar = () => {
                                     <MotionButton
                                         component={RouterLink}
                                         to="/dashboard"
+                                        color="primary"
                                         sx={{
                                             color: 'var(--text-primary)',
                                             textTransform: 'none',
-                                            fontWeight: 500,
                                             '&:hover': {
                                                 background: 'rgba(31, 53, 199, 0.08)',
                                             }
@@ -273,6 +289,22 @@ const Navbar = () => {
                                         whileTap={{ scale: 0.95 }}
                                     >
                                         Dashboard
+                                    </MotionButton>
+                                    <MotionButton
+                                        component={RouterLink}
+                                        to="/feed"
+                                        color="primary"
+                                        sx={{
+                                            color: 'var(--text-primary)',
+                                            textTransform: 'none',
+                                            '&:hover': {
+                                                background: 'rgba(31, 53, 199, 0.08)',
+                                            }
+                                        }}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        Community Feed
                                     </MotionButton>
                                     <MotionButton
                                         component={RouterLink}
