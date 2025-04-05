@@ -26,7 +26,7 @@ const Dashboard = () => {
         const fetchUserPosts = async () => {
             try {
                 const token = await getAccessTokenSilently();
-                const response = await axios.get('http://localhost:5000/api/posts/user', {
+                const response = await axios.get('http://localhost:5050/api/posts/user', {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },

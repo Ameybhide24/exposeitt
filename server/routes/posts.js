@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
+const User = require('../models/User');
 const { expressjwt: jwt } = require('express-jwt');
 const jwks = require('jwks-rsa');
 
@@ -29,14 +30,26 @@ router.get('/', async (req, res) => {
 
 // Create a new post
 router.post('/', jwtCheck, async (req, res) => {
-    const post = new Post({
-        title: req.body.title,
-        content: req.body.content,
-        category: req.body.category
-    });
-
     try {
+        // Find user
+        const user = await User.findOne({ auth0Id: req.auth.sub });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const post = new Post({
+            title: req.body.title,
+            content: req.body.content,
+            category: req.body.category,
+            user: user._id
+        });
+
         const newPost = await post.save();
+        
+        // Add post to user's posts array
+        user.posts.push(newPost._id);
+        await user.save();
+
         res.status(201).json(newPost);
     } catch (err) {
         res.status(400).json({ message: err.message });

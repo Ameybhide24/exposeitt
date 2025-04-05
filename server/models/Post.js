@@ -26,6 +26,11 @@ const postSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -39,5 +44,10 @@ const postSchema = new mongoose.Schema({
     toJSON: { getters: true },
     toObject: { getters: true }
 });
+
+// Index for faster queries
+postSchema.index({ user: 1 });
+postSchema.index({ status: 1 });
+postSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema); 

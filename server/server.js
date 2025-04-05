@@ -8,6 +8,7 @@ const jwks = require('jwks-rsa');
 require('dotenv').config();
 
 const postsRouter = require('./routes/posts');
+const usersRouter = require('./routes/users');
 
 const app = express();
 
@@ -31,12 +32,16 @@ const jwtCheck = jwt({
 });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/posts', postsRouter);
+app.use('/api/users', usersRouter);
 
 app.get('/api/public', (req, res) => {
     res.json({ message: 'Public endpoint' });
@@ -49,10 +54,13 @@ app.get('/api/private', jwtCheck, (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
     console.error(err.stack);
+    if (err.name === 'UnauthorizedError') {
+        return res.status(401).json({ message: 'Invalid token' });
+    }
     res.status(500).json({ message: 'Something went wrong!' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 }); 

@@ -4,7 +4,6 @@ import {
     Typography,
     Box,
     Paper,
-    Grid,
     Card,
     CardContent,
     Button,
@@ -16,6 +15,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import PublicIcon from '@mui/icons-material/Public';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
+import '../styles/EnhancedUI.css';
 
 const MotionCard = motion(Card);
 
@@ -26,51 +26,56 @@ const Home = () => {
 
     const features = [
         {
-            icon: <SecurityIcon sx={{ fontSize: 40 }} />,
+            icon: <SecurityIcon sx={{ fontSize: 56, color: '#1f35c7' }} />,
             title: 'Secure',
             description: 'Your identity is protected with advanced encryption and authentication.',
-            color: '#4CAF50'
+            color: '#1f35c7'
         },
         {
-            icon: <LockIcon sx={{ fontSize: 40 }} />,
+            icon: <LockIcon sx={{ fontSize: 56, color: '#4285f4' }} />,
             title: 'Anonymous',
             description: 'Post your concerns without revealing your identity.',
-            color: '#2196F3'
+            color: '#4285f4'
         },
         {
-            icon: <PublicIcon sx={{ fontSize: 40 }} />,
+            icon: <PublicIcon sx={{ fontSize: 56, color: '#1f35c7' }} />,
             title: 'Accessible',
             description: 'Easy to use platform available to everyone.',
-            color: '#FF9800'
+            color: '#1f35c7'
         }
     ];
 
     return (
         <Box sx={{ 
-            background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+            background: 'var(--background-color)',
             minHeight: '100vh',
-            py: 8
+            py: { xs: 4, md: 8 },
+            px: { xs: 2, md: 0 }
         }}>
             <Container maxWidth="lg">
                 <Box sx={{ 
                     textAlign: 'center',
-                    mb: 8,
-                    color: 'white'
+                    mb: { xs: 6, md: 8 }
                 }}>
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8 }}
+                        transition={{ duration: 0.8, ease: [0.34, 1.56, 0.64, 1] }}
+                        className="fade-in"
                     >
                         <Typography 
                             variant={isMobile ? "h3" : "h2"} 
                             component="h1" 
                             gutterBottom
+                            className="enhanced-typography"
                             sx={{
-                                fontWeight: 'bold',
-                                background: 'linear-gradient(45deg, #FF9800, #FF5722)',
+                                fontWeight: 800,
+                                background: 'var(--primary-gradient)',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
+                                mb: 2,
+                                letterSpacing: '-0.02em',
+                                fontSize: { xs: '2.5rem', md: '3.5rem' }
                             }}
                         >
                             Welcome to Whistleblower
@@ -80,106 +85,101 @@ const Home = () => {
                         variant="h5" 
                         component="h2" 
                         gutterBottom 
+                        className="enhanced-typography-secondary"
                         sx={{ 
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            mb: 4
+                            mb: 4,
+                            maxWidth: '600px',
+                            mx: 'auto',
+                            lineHeight: 1.4,
+                            fontWeight: 500,
+                            fontSize: { xs: '1.25rem', md: '1.5rem' }
                         }}
                     >
                         A secure platform for anonymous reporting
                     </Typography>
                     <Button
+                        className="enhanced-button"
                         variant="contained"
                         size="large"
                         onClick={() => loginWithRedirect()}
-                        sx={{
-                            background: 'linear-gradient(45deg, #FF9800, #FF5722)',
-                            color: 'white',
-                            padding: '12px 36px',
-                            borderRadius: '30px',
-                            fontSize: '1.1rem',
-                            textTransform: 'none',
-                            boxShadow: '0 4px 15px rgba(255, 152, 0, 0.3)',
-                            '&:hover': {
-                                background: 'linear-gradient(45deg, #FF5722, #FF9800)',
-                            }
-                        }}
                     >
                         Get Started
                     </Button>
                 </Box>
 
-                <Grid container spacing={4} sx={{ mt: 4 }}>
+                <Box className="features-grid">
                     {features.map((feature, index) => (
-                        <Grid item xs={12} md={4} key={index}>
-                            <MotionCard
-                                initial={{ opacity: 0, y: 50 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5, delay: index * 0.2 }}
-                                sx={{
-                                    height: '100%',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    backdropFilter: 'blur(10px)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '15px',
-                                    transition: 'transform 0.3s ease-in-out',
-                                    '&:hover': {
-                                        transform: 'translateY(-10px)',
-                                    }
-                                }}
-                            >
-                                <CardContent sx={{ textAlign: 'center', p: 4 }}>
-                                    <Box sx={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'center', 
+                        <MotionCard
+                            key={index}
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: index * 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+                            className="enhanced-card"
+                            elevation={0}
+                        >
+                            <CardContent sx={{ 
+                                textAlign: 'center', 
+                                p: 4,
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: '#ffffff'
+                            }}>
+                                <Box className="feature-icon">
+                                    {feature.icon}
+                                </Box>
+                                <Typography 
+                                    variant="h5" 
+                                    component="h3" 
+                                    gutterBottom
+                                    className="enhanced-typography"
+                                    sx={{ 
+                                        fontWeight: 700,
                                         mb: 2,
-                                        color: feature.color
-                                    }}>
-                                        {feature.icon}
-                                    </Box>
-                                    <Typography 
-                                        variant="h5" 
-                                        component="h3" 
-                                        gutterBottom
-                                        sx={{ 
-                                            color: 'white',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {feature.title}
-                                    </Typography>
-                                    <Typography 
-                                        variant="body1" 
-                                        sx={{ 
-                                            color: 'rgba(255, 255, 255, 0.7)',
-                                            lineHeight: 1.6
-                                        }}
-                                    >
-                                        {feature.description}
-                                    </Typography>
-                                </CardContent>
-                            </MotionCard>
-                        </Grid>
+                                        fontSize: '1.5rem',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                >
+                                    {feature.title}
+                                </Typography>
+                                <Typography 
+                                    variant="body1" 
+                                    className="enhanced-typography-secondary"
+                                    sx={{ 
+                                        lineHeight: 1.6,
+                                        fontSize: '1.1rem',
+                                        maxWidth: '280px',
+                                        color: 'var(--text-secondary)',
+                                        fontWeight: 400
+                                    }}
+                                >
+                                    {feature.description}
+                                </Typography>
+                            </CardContent>
+                        </MotionCard>
                     ))}
-                </Grid>
+                </Box>
 
                 <Paper 
                     elevation={0}
+                    className="enhanced-card"
                     sx={{ 
-                        mt: 8,
-                        p: 4,
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '15px',
+                        mt: { xs: 6, md: 8 },
+                        p: { xs: 3, md: 4 },
+                        background: '#ffffff'
                     }}
                 >
                     <Typography 
                         variant="h4" 
                         gutterBottom
+                        className="enhanced-typography"
                         sx={{ 
-                            color: 'white',
-                            fontWeight: 'bold',
-                            mb: 3
+                            fontWeight: 700,
+                            mb: 4,
+                            fontSize: { xs: '1.75rem', md: '2rem' },
+                            color: 'var(--text-primary)'
                         }}
                     >
                         How It Works
@@ -191,39 +191,26 @@ const Home = () => {
                             'Your report will be encrypted and stored securely',
                             'Track the status of your report through your dashboard'
                         ].map((step, index) => (
-                            <Box 
+                            <motion.div
                                 key={index}
-                                sx={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center',
-                                    gap: 2
-                                }}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                                className="step-container"
                             >
-                                <Box
-                                    sx={{
-                                        width: 30,
-                                        height: 30,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(45deg, #FF9800, #FF5722)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'white',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {index + 1}
-                                </Box>
+                                <div className="step-number">{index + 1}</div>
                                 <Typography 
                                     variant="body1"
+                                    className="enhanced-typography-secondary"
                                     sx={{ 
-                                        color: 'rgba(255, 255, 255, 0.8)',
-                                        fontSize: '1.1rem'
+                                        fontSize: '1.1rem',
+                                        fontWeight: 500,
+                                        color: 'var(--text-secondary)'
                                     }}
                                 >
                                     {step}
                                 </Typography>
-                            </Box>
+                            </motion.div>
                         ))}
                     </Box>
                 </Paper>
