@@ -6,18 +6,18 @@ class PostService {
     const prompt = `
     Convert this crime report into a structured social media post with these EXACT sections:
     
-    1. heading: A short, attention-grabbing headline (include relevant emoji), take reference from ${body.title}
+    1. title: A short, attention-grabbing headline (include relevant emoji), take reference from ${body.title}
     2. category: ${body.category}
-    3. locationTime: Combine location (format: "📍 [location]") and time (format: "🕒 [time]") if available in ${body.location}
-    4. summary: 2-3 sentence description of what happened
+    3. location: Combine location (format: "📍 [location]") and time (format: "🕒 [time]") if available in ${body.location}
+    4. content: 2-3 sentence description of what happened
     5. additionalInfo: Any safety advice or follow-up actions
     
     Return ONLY a RAW JSON object without any markdown formatting or additional text.
     Example:
     {
-      "heading": "🚨 Purse Snatching Reported",
-      "locationTime": "📍 Central Park 🕒 Yesterday at 5pm",
-      "summary": "Two suspects in black jackets stole a woman's purse...",
+      "title": "🚨 Purse Snatching Reported",
+      "location": "📍 Central Park 🕒 Yesterday at 5pm",
+      "content": "Two suspects in black jackets stole a woman's purse...",
       "additionalInfo": "Avoid the area and report any suspicious activity."
     }
 
