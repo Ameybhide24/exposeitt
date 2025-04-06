@@ -216,6 +216,35 @@ router.patch('/:id/report-to-authorities', checkJwt, async (req, res) => {
     }
 });
 
+// Upvote a post
+router.post('/upvote/:id', async (req, res) => {
+  try {
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { upvotes: 1 } },
+      { new: true }
+    );
+    res.json(post);
+  } catch (err) {
+    res.status(500).json({ message: 'Error upvoting post' });
+  }
+});
+
+// Downvote a post
+router.post('/downvote/:id', async (req, res) => {
+  try {
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { downvotes: 1 } },
+      { new: true }
+    );
+    res.json(post);
+  } catch (err) {
+    res.status(500).json({ message: 'Error downvoting post' });
+  }
+});
+
+
 // Notify authorities via email
 router.post('/:id/notify-authorities', checkJwt, async (req, res) => {
     try {

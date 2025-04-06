@@ -70,8 +70,11 @@ const postSchema = new mongoose.Schema({
         type: String,
         enum: ['posted', 'reported'],
         default: 'posted'
-    }
-}, {
+    },
+    upvotes: { type: Number, default: 0 },
+    downvotes: { type: Number, default: 0 },
+},
+ {
     timestamps: true,
     toJSON: { getters: true },
     toObject: { getters: true }

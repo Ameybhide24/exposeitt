@@ -154,20 +154,34 @@ const Feed = () => {
     }, [posts, searchTerm, sortBy]);
 
     const PostCard = ({ post }) => {
-        const [votes, setVotes] = useState(0);
+        const [votes, setVotes] = useState(post.upvotes - post.downvotes || 0);
         const [userVote, setUserVote] = useState(null);
         const [menuAnchorEl, setMenuAnchorEl] = useState(null);
         const isSaved = savedPosts.has(post._id);
 
-        const handleVote = (direction) => {
-            if (userVote === direction) {
-                setVotes(votes - direction);
-                setUserVote(null);
-            } else {
-                setVotes(votes + direction - (userVote || 0));
+        const handleVote = async (direction) => {
+            const postId = post._id;
+        
+            try {
+                
+                let updatedPost;
+        
+                if (direction === 1) {
+                    const res = await axios.post(`http://localhost:5050/api/posts/upvote/${postId}`);
+                    updatedPost = res.data;
+                } else if (direction === -1) {
+                    const res = await axios.post(`http://localhost:5050/api/posts/downvote/${postId}`);
+                    updatedPost = res.data;
+                }
+        
+                // Update votes from backend response
+                setVotes(updatedPost.upvotes - updatedPost.downvotes);
                 setUserVote(direction);
+            } catch (err) {
+                console.error("Failed to vote:", err);
             }
         };
+        
 
         const handleMenuClick = (event) => {
             setMenuAnchorEl(event.currentTarget);
