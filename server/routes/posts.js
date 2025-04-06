@@ -3,6 +3,7 @@ const router = express.Router();
 const Post = require('../models/Post');
 const { auth } = require('express-oauth2-jwt-bearer');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 // Auth0 middleware
 const checkJwt = auth({
@@ -14,6 +15,30 @@ const checkJwt = auth({
 const generateAnonymousId = (userId) => {
     const hash = crypto.createHash('sha256').update(userId).digest('hex');
     return hash.substring(0, 8); // Take first 8 characters for shorter ID
+};
+
+// Email configuration
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+    }
+});
+
+// Police department email mapping (you should expand this based on your needs)
+const getPoliceDepartmentEmail = (location) => {
+    // This is a simplified example - you should implement proper location-based mapping
+    const locationMap = {
+        'Pune': 'pune.police@example.com',
+        'Mumbai': 'mumbai.police@example.com',
+        // Add more mappings as needed
+        'default': 'police.department@example.com'
+    };
+
+    // Extract city name from location (implement more sophisticated parsing as needed)
+    const city = location.split(',')[0].trim();
+    return locationMap[city] || locationMap.default;
 };
 
 // Get feed (all posts with anonymized user data) - Public route
@@ -188,6 +213,64 @@ router.patch('/:id/report-to-authorities', checkJwt, async (req, res) => {
     } catch (err) {
         console.error('Error reporting post to authorities:', err);
         res.status(500).json({ message: 'Failed to report post to authorities' });
+    }
+});
+
+// Notify authorities via email
+router.post('/:id/notify-authorities', checkJwt, async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Verify that the user is the owner of the post
+        if (post.userId !== req.auth?.payload?.sub) {
+            return res.status(403).json({ message: 'Not authorized to report this post' });
+        }
+
+        // Get police department email based on location
+        const policeEmail = getPoliceDepartmentEmail(post.location);
+
+        // Prepare email content
+        const emailContent = {
+            from: process.env.EMAIL_USER,
+            to: policeEmail,
+            subject: `Anonymous Incident Report: ${post.category}`,
+            html: `
+                <h2>Anonymous Incident Report</h2>
+                <p><strong>Category:</strong> ${post.category}</p>
+                <p><strong>Location:</strong> ${post.location}</p>
+                <p><strong>Date Reported:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>Incident Details:</strong></p>
+                <p>${post.content}</p>
+                <hr>
+                <p><em>This is an automated report from the WhistleBlower platform. The reporter's identity has been kept anonymous for their protection.</em></p>
+            `
+        };
+
+        try {
+            // First try to send the email
+            await transporter.sendMail(emailContent);
+            
+            // If email is sent successfully, then update the post status
+            post.status = 'reported';
+            await post.save();
+            
+            res.json({
+                message: 'Report has been sent to authorities and post status updated',
+                sentTo: policeEmail
+            });
+        } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            res.status(500).json({ 
+                message: 'Failed to send report to authorities',
+                error: 'Email service error. Please check email configuration.'
+            });
+        }
+    } catch (err) {
+        console.error('Error in notify-authorities route:', err);
+        res.status(500).json({ message: 'Server error while processing report' });
     }
 });
 

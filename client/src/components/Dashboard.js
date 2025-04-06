@@ -23,6 +23,7 @@ const Dashboard = () => {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const { getAccessTokenSilently } = useAuth0();
     const navigate = useNavigate();
 
@@ -48,22 +49,19 @@ const Dashboard = () => {
     }, [getAccessTokenSilently]);
 
     const handleReportToAuthorities = async (postId) => {
+        setError('');
         try {
             const token = await getAccessTokenSilently();
-            console.log('Attempting to report post:', postId);
-            
-            const response = await axios.patch(
-                `http://localhost:5050/api/posts/${postId}/report-to-authorities`,
-                { status: 'reported' },
+            const response = await axios.post(
+                `http://localhost:5050/api/posts/${postId}/notify-authorities`,
+                {},
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    },
+                    }
                 }
             );
-
-            console.log('Report response:', response.data);
 
             // Update the local state to reflect the change
             setPosts(posts.map(post => 
@@ -72,20 +70,23 @@ const Dashboard = () => {
                     : post
             ));
 
-            // Clear any existing error
-            setError('');
-        } catch (err) {
-            console.error('Error reporting to authorities:', {
-                message: err.message,
-                response: err.response?.data,
-                status: err.response?.status
-            });
+            // Show success message
+            setSuccessMessage('Report successfully sent to authorities');
             
-            // Set a more specific error message
-            setError(
-                err.response?.data?.message || 
-                'Failed to report to authorities. Please try again later.'
-            );
+            // Clear success message after 5 seconds
+            setTimeout(() => {
+                setSuccessMessage('');
+            }, 5000);
+
+        } catch (err) {
+            console.error('Error reporting to authorities:', err);
+            const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to send report to authorities';
+            setError(errorMessage);
+            
+            // Clear error message after 5 seconds
+            setTimeout(() => {
+                setError('');
+            }, 5000);
         }
     };
 
