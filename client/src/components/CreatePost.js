@@ -20,6 +20,8 @@ import {
     Card,
     CardContent,
     Divider,
+    IconButton,
+    Grid,
 } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import axios from 'axios';
@@ -35,6 +37,12 @@ import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import AddAPhotoIcon from '@mui/icons-material/AddAPhoto';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ImageIcon from '@mui/icons-material/Image';
+import CloseIcon from '@mui/icons-material/Close';
 
 const categories = [
     { value: 'Workplace Issues', icon: '🏢', description: 'Report workplace harassment, discrimination, or safety concerns' },
@@ -65,6 +73,13 @@ const CreatePost = () => {
     const [recordingError, setRecordingError] = useState('');
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
+    
+    // Add media upload states
+    const [mediaFiles, setMediaFiles] = useState([]);
+    const [mediaPreviews, setMediaPreviews] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef(null);
 
     const handleNext = () => {
         if (activeStep === 0 && (!category || !title || !location)) {
@@ -182,6 +197,115 @@ const CreatePost = () => {
         }
     };
 
+    const handleMediaUpload = async (files) => {
+        if (!files || files.length === 0) return;
+
+        setIsUploading(true);
+        setUploadProgress(0);
+        setError('');
+
+        try {
+            // Create previews for all files
+            const newPreviews = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileType = file.type.startsWith('image/') ? 'image' : 
+                               file.type.startsWith('video/') ? 'video' : null;
+
+                if (!fileType) {
+                    console.warn('Skipping unsupported file type:', file.type);
+                    continue;
+                }
+
+                // Create preview
+                const reader = new FileReader();
+                const preview = await new Promise((resolve) => {
+                    reader.onloadend = () => resolve({
+                        dataUrl: reader.result,
+                        type: fileType
+                    });
+                    reader.readAsDataURL(file);
+                });
+
+                newPreviews.push(preview);
+            }
+
+            setMediaPreviews([...mediaPreviews, ...newPreviews]);
+
+            // Create form data for upload
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('media', files[i]);
+            }
+
+            const token = await getAccessTokenSilently();
+            const response = await axios.post(
+                'http://localhost:5050/api/posts/upload-media',
+                formData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    onUploadProgress: (progressEvent) => {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / progressEvent.total
+                        );
+                        setUploadProgress(percentCompleted);
+                    }
+                }
+            );
+
+            console.log('Upload response:', response.data);
+            
+            // Add new media files to the existing ones
+            if (response.data.media && response.data.media.length > 0) {
+                const newMediaFiles = response.data.media.map(item => ({
+                    url: item.filename,
+                    type: item.mediaType
+                }));
+                
+                setMediaFiles([...mediaFiles, ...newMediaFiles]);
+            }
+            
+            setUploadProgress(100);
+            
+        } catch (err) {
+            console.error('Error uploading media:', err);
+            setError('Failed to upload media. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleMediaUpload(e.target.files);
+        }
+    };
+
+    const handleFileDrop = (e) => {
+        e.preventDefault();
+        
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleMediaUpload(e.dataTransfer.files);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+    };
+
+    const handleRemoveMedia = (index) => {
+        setMediaFiles(prev => prev.filter((_, i) => i !== index));
+        setMediaPreviews(prev => prev.filter((_, i) => i !== index));
+        
+        // Reset file input if all files are removed
+        if (mediaFiles.length === 1 && fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         
@@ -226,12 +350,24 @@ const CreatePost = () => {
                 }
             );
 
+            // Log media info before creating post
+            console.log('Media info before post creation:', {
+                mediaFiles,
+                mediaPreviews,
+                hasMediaFiles: !!mediaFiles.length,
+                hasMediaPreviews: !!mediaPreviews.length
+            });
+
             // Prepare post data - use enhanced data if available, otherwise use original data
             const postData = aiEnhancedPost ? {
                 title: String(aiEnhancedPost.title).trim(),
                 content: String(aiEnhancedPost.content).trim(),
                 category: String(aiEnhancedPost.category).trim(),
                 location: String(aiEnhancedPost.location).trim(),
+                media: mediaFiles.map(item => ({
+                    url: item.url,
+                    type: item.type
+                })),
                 userId: user.sub,
                 authorName: user.name,
                 authorEmail: user.email,
@@ -241,6 +377,10 @@ const CreatePost = () => {
                 content: String(content).trim(),
                 category: String(category).trim(),
                 location: String(location).trim(),
+                media: mediaFiles.map(item => ({
+                    url: item.url,
+                    type: item.type
+                })),
                 userId: user.sub,
                 authorName: user.name,
                 authorEmail: user.email,
@@ -248,7 +388,21 @@ const CreatePost = () => {
             };
 
             console.log('Post data before submission:', postData);
+            const relevanceAssessment = await axios.post(
+                'http://localhost:9000/api/posts/assess-description',
+                { description: postData.content },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                }
+            );
+            console.log(relevanceAssessment, "here it issssss");
+            if (relevanceAssessment.data.isRelevant === "no") {
+                setError("This description does not pertain to a crime.");
 
+                return;
+            }
             // Submit the post
             const response = await axios.post(
                 'http://localhost:5050/api/posts',
@@ -269,6 +423,8 @@ const CreatePost = () => {
             setCategory('');
             setLocation('');
             setAiEnhancedPost(null);
+            setMediaFiles([]);
+            setMediaPreviews([]);
             navigate('/dashboard', { replace: true });
         } catch (err) {
             console.error('Error details:', {
@@ -340,7 +496,7 @@ const CreatePost = () => {
             case 1:
                 return (
                     <Box sx={{ mt: 3 }}>
-                        <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                             {!isRecording && !audioBlob && (
                                 <Button
                                     variant="outlined"
@@ -399,6 +555,171 @@ const CreatePost = () => {
                             )}
                         </Box>
 
+                        {/* Media Upload Section */}
+                        <Box 
+                            sx={{ 
+                                mb: 3, 
+                                border: '2px dashed rgba(0, 0, 0, 0.2)',
+                                borderRadius: 2,
+                                p: 3,
+                                textAlign: 'center',
+                                backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                    borderColor: 'primary.main',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                                },
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: mediaPreviews.length > 0 ? 'flex-start' : 'center', 
+                            }}
+                            onClick={() => fileInputRef.current?.click()}
+                            onDrop={handleFileDrop}
+                            onDragOver={handleDragOver}
+                        >
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*, video/*"
+                                onChange={handleFileChange}
+                                multiple
+                                style={{ display: 'none' }}
+                            />
+                            
+                            {mediaPreviews.length === 0 ? (
+                                <>
+                                    <Box sx={{ mb: 2 }}>
+                                        <AttachFileIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                                    </Box>
+                                    <Typography variant="h6" gutterBottom>
+                                        Add Media Evidence
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        Drag & drop images or videos, or click to browse
+                                    </Typography>
+                                    <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+                                        <Button 
+                                            variant="outlined" 
+                                            startIcon={<AddAPhotoIcon />}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileInputRef.current?.click();
+                                            }}
+                                        >
+                                            Upload Media
+                                        </Button>
+                                    </Box>
+                                </>
+                            ) : (
+                                <>
+                                    <Box sx={{ width: '100%', mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="h6" color="primary">
+                                            Media Files ({mediaPreviews.length})
+                                        </Typography>
+                                        <Button 
+                                            variant="outlined" 
+                                            startIcon={<AddAPhotoIcon />}
+                                            size="small"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                fileInputRef.current?.click();
+                                            }}
+                                        >
+                                            Add More
+                                        </Button>
+                                    </Box>
+                                    
+                                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                                        {mediaPreviews.map((preview, index) => (
+                                            <Grid item xs={12} sm={6} md={4} key={index}>
+                                                <Box sx={{ position: 'relative', height: '100%' }}>
+                                                    <IconButton 
+                                                        sx={{ 
+                                                            position: 'absolute', 
+                                                            top: 8, 
+                                                            right: 8,
+                                                            zIndex: 2,
+                                                            backgroundColor: 'rgba(0,0,0,0.5)',
+                                                            color: 'white',
+                                                            '&:hover': {
+                                                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                                            }
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveMedia(index);
+                                                        }}
+                                                    >
+                                                        <CloseIcon />
+                                                    </IconButton>
+                                                    
+                                                    {preview.type === 'image' ? (
+                                                        <Box
+                                                            component="img"
+                                                            src={mediaFiles[index]?.url 
+                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                : preview.dataUrl}
+                                                            alt={`Uploaded image ${index + 1}`}
+                                                            sx={{
+                                                                width: '100%',
+                                                                height: '200px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: 1,
+                                                                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                                                            }}
+                                                        />
+                                                    ) : preview.type === 'video' ? (
+                                                        <Box
+                                                            component="video"
+                                                            src={mediaFiles[index]?.url 
+                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                : preview.dataUrl}
+                                                            controls
+                                                            sx={{
+                                                                width: '100%',
+                                                                height: '200px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: 1,
+                                                                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                </Box>
+                                            </Grid>
+                                        ))}
+                                    </Grid>
+                                    
+                                    {isUploading && (
+                                        <Box sx={{ width: '100%', mt: 2 }}>
+                                            <Typography variant="body2">
+                                                Uploading: {uploadProgress}%
+                                            </Typography>
+                                            <Box
+                                                sx={{
+                                                    mt: 1,
+                                                    width: '100%',
+                                                    height: 4,
+                                                    backgroundColor: 'rgba(0,0,0,0.1)',
+                                                    borderRadius: 2,
+                                                    overflow: 'hidden',
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        width: `${uploadProgress}%`,
+                                                        height: '100%',
+                                                        backgroundColor: 'primary.main',
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    )}
+                                </>
+                            )}
+                        </Box>
+
                         <Divider sx={{ my: 3 }}>
                             <Typography color="textSecondary">OR</Typography>
                         </Divider>
@@ -437,272 +758,317 @@ const CreatePost = () => {
                                 
                                 <Typography variant="subtitle2" color="primary">Details</Typography>
                                 <Typography paragraph>{content}</Typography>
-                            </CardContent>
-                        </Card>
-                        
-                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<SmartToyIcon />}
-                                onClick={handleEnhanceWithAI}
-                                disabled={isSubmitting}
-                                sx={{
-                                    borderRadius: 2,
-                                    px: 3,
-                                }}
-                            >
-                                {isSubmitting ? (
-                                    <CircularProgress size={24} color="inherit" />
-                                ) : (
-                                    'Enhance with AI'
-                                )}
-                            </Button>
-                        </Box>
-                    </Box>
-                );
-            case 3:
-                return (
-                    <Box sx={{ mt: 3 }}>
-                        <Card sx={{ mb: 3, backgroundColor: 'rgba(31, 53, 199, 0.04)' }}>
-                            <CardContent>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="h6">
-                                        {aiEnhancedPost ? 'AI Enhanced Report' : 'Your Report'}
-                                    </Typography>
-                                    <Button
-                                        variant="outlined"
-                                        onClick={() => setIsEditingEnhanced(!isEditingEnhanced)}
-                                        startIcon={isEditingEnhanced ? <CheckIcon /> : <EditIcon />}
-                                    >
-                                        {isEditingEnhanced ? 'Save Changes' : 'Edit'}
-                                    </Button>
-                                </Box>
-                                <Divider sx={{ mb: 2 }} />
                                 
-                                {aiEnhancedPost ? (
+                                {mediaPreviews.length > 0 && (
                                     <>
-                                        <Typography variant="subtitle2" color="primary">Title</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={aiEnhancedPost.title}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, title: e.target.value})}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{aiEnhancedPost.title}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Category</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={aiEnhancedPost.category}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, category: e.target.value})}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{aiEnhancedPost.category}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Location & Time</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={aiEnhancedPost.location}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, location: e.target.value})}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{aiEnhancedPost.location}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Content</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                multiline
-                                                rows={4}
-                                                value={aiEnhancedPost.content}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, content: e.target.value})}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{aiEnhancedPost.content}</Typography>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        <Typography variant="subtitle2" color="primary">Category</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={category}
-                                                onChange={(e) => setCategory(e.target.value)}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{category}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Title</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={title}
-                                                onChange={(e) => setTitle(e.target.value)}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{title}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Location</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                value={location}
-                                                onChange={(e) => setLocation(e.target.value)}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{location}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Content</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                multiline
-                                                rows={4}
-                                                value={content}
-                                                onChange={(e) => setContent(e.target.value)}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography paragraph>{content}</Typography>
-                                        )}
+                                        <Typography variant="subtitle2" color="primary">
+                                            Media Evidence ({mediaPreviews.length})
+                                        </Typography>
+                                        <Grid container spacing={2} sx={{ mt: 1, mb: 2 }}>
+                                            {mediaPreviews.map((preview, index) => (
+                                                <Grid item xs={12} sm={6} md={4} key={index}>
+                                                    {preview.type === 'image' ? (
+                                                        <Box
+                                                            component="img"
+                                                            src={mediaFiles[index]?.url 
+                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                : preview.dataUrl}
+                                                            alt={`Uploaded image ${index + 1}`}
+                                                            sx={{
+                                                                width: '100%',
+                                                                height: '150px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: 1,
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                                            }}
+                                                        />
+                                                    ) : preview.type === 'video' ? (
+                                                        <Box
+                                                            component="video"
+                                                            src={mediaFiles[index]?.url 
+                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                : preview.dataUrl}
+                                                            controls
+                                                            sx={{
+                                                                width: '100%',
+                                                                height: '150px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: 1,
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                </Grid>
+                                            ))}
+                                        </Grid>
                                     </>
                                 )}
                             </CardContent>
                         </Card>
                         
-                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
-                            <Button
-                                variant="contained"
-                                startIcon={<PublishIcon />}
-                                onClick={handleSubmit}
-                                disabled={isSubmitting}
-                                sx={{
-                                    borderRadius: 2,
-                                    px: 3,
-                                    background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
-                                    '&:hover': {
-                                        background: 'linear-gradient(45deg, #283593 30%, #1a237e 90%)',
-                                    }
-                                }}
-                            >
-                                {isSubmitting ? (
-                                    <CircularProgress size={24} color="inherit" />
-                                ) : (
-                                    'Publish Report'
-                                )}
-                            </Button>
-                        </Box>
-                    </Box>
-                );
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <Container maxWidth="md">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-            >
-                <Paper 
-                    elevation={3} 
-                    sx={{ 
-                        p: 4, 
-                        mt: 4,
-                        borderRadius: 2,
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)'
-                    }}
-                >
-                    <Typography 
-                        variant="h4" 
-                        gutterBottom
-                        sx={{ 
-                            color: 'primary.main',
-                            fontWeight: 600,
-                            mb: 3
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<SmartToyIcon />}
+                        onClick={handleEnhanceWithAI}
+                        disabled={isSubmitting}
+                        sx={{
+                            borderRadius: 2,
+                            px: 3,
                         }}
                     >
-                        Submit a Report
-                    </Typography>
+                        {isSubmitting ? (
+                            <CircularProgress size={24} color="inherit" />
+                        ) : (
+                            'Enhance with AI'
+                        )}
+                    </Button>
+                </Box>
+            </Box>
+        );
+    case 3:
+        return (
+            <Box sx={{ mt: 3 }}>
+                <Card sx={{ mb: 3, backgroundColor: 'rgba(31, 53, 199, 0.04)' }}>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="h6">
+                                {aiEnhancedPost ? 'AI Enhanced Report' : 'Your Report'}
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                onClick={() => setIsEditingEnhanced(!isEditingEnhanced)}
+                                startIcon={isEditingEnhanced ? <CheckIcon /> : <EditIcon />}
+                            >
+                                {isEditingEnhanced ? 'Save Changes' : 'Edit'}
+                            </Button>
+                        </Box>
+                        <Divider sx={{ mb: 2 }} />
+                        
+                        {aiEnhancedPost ? (
+                            <>
+                                <Typography variant="subtitle2" color="primary">Title</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={aiEnhancedPost.title}
+                                        onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, title: e.target.value})}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{aiEnhancedPost.title}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Category</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={aiEnhancedPost.category}
+                                        onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, category: e.target.value})}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{aiEnhancedPost.category}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Location & Time</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={aiEnhancedPost.location}
+                                        onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, location: e.target.value})}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{aiEnhancedPost.location}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Content</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        rows={4}
+                                        value={aiEnhancedPost.content}
+                                        onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, content: e.target.value})}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{aiEnhancedPost.content}</Typography>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Typography variant="subtitle2" color="primary">Category</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={category}
+                                        onChange={(e) => setCategory(e.target.value)}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{category}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Title</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{title}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Location</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        value={location}
+                                        onChange={(e) => setLocation(e.target.value)}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{location}</Typography>
+                                )}
+                                
+                                <Typography variant="subtitle2" color="primary">Content</Typography>
+                                {isEditingEnhanced ? (
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        rows={4}
+                                        value={content}
+                                        onChange={(e) => setContent(e.target.value)}
+                                        sx={{ mb: 2 }}
+                                    />
+                                ) : (
+                                    <Typography paragraph>{content}</Typography>
+                                )}
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+                
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
+                    <Button
+                        variant="contained"
+                        startIcon={<PublishIcon />}
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        sx={{
+                            borderRadius: 2,
+                            px: 3,
+                            background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
+                            '&:hover': {
+                                background: 'linear-gradient(45deg, #283593 30%, #1a237e 90%)',
+                            }
+                        }}
+                    >
+                        {isSubmitting ? (
+                            <CircularProgress size={24} color="inherit" />
+                        ) : (
+                            'Publish Report'
+                        )}
+                    </Button>
+                </Box>
+            </Box>
+        );
+    default:
+        return null;
+}
+};
 
-                    <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-                        {steps.map((label) => (
-                            <Step key={label}>
-                                <StepLabel>{label}</StepLabel>
-                            </Step>
-                        ))}
-                    </Stepper>
+return (
+    <Container maxWidth="md">
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+        >
+            <Paper 
+                elevation={3} 
+                sx={{ 
+                    p: 4, 
+                    mt: 4,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)'
+                }}
+            >
+                <Typography 
+                    variant="h4" 
+                    gutterBottom
+                    sx={{ 
+                        color: 'primary.main',
+                        fontWeight: 600,
+                        mb: 3
+                    }}
+                >
+                    Submit a Report
+                </Typography>
 
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 3 }}>
-                            {error}
-                        </Alert>
-                    )}
+                <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+                    {steps.map((label) => (
+                        <Step key={label}>
+                            <StepLabel>{label}</StepLabel>
+                        </Step>
+                    ))}
+                </Stepper>
 
-                    {renderStepContent(activeStep)}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {error}
+                    </Alert>
+                )}
 
-                    <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
+                {renderStepContent(activeStep)}
+
+                <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={activeStep === 0 ? () => navigate(-1) : handleBack}
+                        sx={{
+                            borderRadius: 2,
+                            px: 4,
+                        }}
+                    >
+                        {activeStep === 0 ? 'Cancel' : 'Back'}
+                    </Button>
+                    {activeStep < 3 && (
                         <Button
-                            variant="outlined"
-                            onClick={activeStep === 0 ? () => navigate(-1) : handleBack}
+                            variant="contained"
+                            onClick={handleNext}
                             sx={{
                                 borderRadius: 2,
                                 px: 4,
+                                background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
+                                '&:hover': {
+                                    background: 'linear-gradient(45deg, #283593 30%, #1a237e 90%)',
+                                }
                             }}
                         >
-                            {activeStep === 0 ? 'Cancel' : 'Back'}
+                            Next
                         </Button>
-                        {activeStep < 3 && (
-                            <Button
-                                variant="contained"
-                                onClick={handleNext}
-                                sx={{
-                                    borderRadius: 2,
-                                    px: 4,
-                                    background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
-                                    '&:hover': {
-                                        background: 'linear-gradient(45deg, #283593 30%, #1a237e 90%)',
-                                    }
-                                }}
-                            >
-                                Next
-                            </Button>
-                        )}
-                    </Box>
+                    )}
+                </Box>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <LockIcon color="primary" />
-                            <Typography variant="body2">End-to-end encrypted</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <SecurityIcon color="primary" />
-                            <Typography variant="body2">Anonymous submission</Typography>
-                        </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LockIcon color="primary" />
+                        <Typography variant="body2">End-to-end encrypted</Typography>
                     </Box>
-                </Paper>
-            </motion.div>
-        </Container>
-    );
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <SecurityIcon color="primary" />
+                        <Typography variant="body2">Anonymous submission</Typography>
+                    </Box>
+                </Box>
+            </Paper>
+        </motion.div>
+    </Container>
+);
 };
 
 export default CreatePost; 

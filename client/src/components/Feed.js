@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
     Box,
     Card,
@@ -78,6 +79,17 @@ const Feed = () => {
             console.log('Fetching posts from feed...');
             const response = await axios.get('http://localhost:5050/api/posts/feed');
             console.log('Received posts:', response.data);
+            
+            // Log media information for debugging
+            response.data.forEach(post => {
+                if (post.mediaUrl) {
+                    console.log(`Post ${post._id} has media:`, {
+                        mediaUrl: post.mediaUrl,
+                        mediaType: post.mediaType
+                    });
+                }
+            });
+            
             setPosts(response.data);
             setLoading(false);
         } catch (err) {
@@ -158,14 +170,38 @@ const Feed = () => {
         const [userVote, setUserVote] = useState(null);
         const [menuAnchorEl, setMenuAnchorEl] = useState(null);
         const isSaved = savedPosts.has(post._id);
+        const [imageError, setImageError] = useState(false);
+        const [upvotes, setUpvotes] = useState(post.upvotes || 0);
+        const [downvotes, setDownvotes] = useState(post.downvotes || 0);
+        // Log media info when post is rendered
+        useEffect(() => {
+            if (post.media && post.media.length > 0) {
+                console.log(`Rendering post ${post._id} with media:`, {
+                    mediaCount: post.media.length,
+                    mediaTypes: post.media.map(m => m.type)
+                });
+            }
+        }, [post]);
 
-        const handleVote = (direction) => {
-            if (userVote === direction) {
-                setVotes(votes - direction);
-                setUserVote(null);
-            } else {
-                setVotes(votes + direction - (userVote || 0));
+        const handleVote = async (direction) => {
+            const postId = post._id;
+        
+            try {
+                let updatedPost;
+        
+                if (direction === 1) {
+                    const res = await axios.post(`http://localhost:5050/api/posts/upvote/${postId}`);
+                    updatedPost = res.data;
+                } else if (direction === -1) {
+                    const res = await axios.post(`http://localhost:5050/api/posts/downvote/${postId}`);
+                    updatedPost = res.data;
+                }
+        
+                setUpvotes(updatedPost.upvotes || 0);
+                setDownvotes(updatedPost.downvotes || 0);
                 setUserVote(direction);
+            } catch (err) {
+                console.error("Failed to vote:", err);
             }
         };
 
@@ -188,6 +224,40 @@ const Feed = () => {
 
         const avatarColor = getRandomColor(post.authorName);
 
+        const handleImageError = (e) => {
+            // Log detailed error information
+            console.error('Error loading image:', {
+                target: e.target.src,
+                error: e
+            });
+            
+            setImageError(true);
+            e.target.onerror = null; // Prevent infinite error loop
+            e.target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Available';
+        };
+
+        // Helper function to get the correct media URL
+        const getMediaUrl = (mediaPath) => {
+            // Make sure we have a valid media path
+            if (!mediaPath) return null;
+            
+            // Ensure we're using the correct server URL
+            const serverBaseUrl = 'http://localhost:5050';
+            
+            // Check if the URL already has http/https
+            if (mediaPath.startsWith('http')) {
+                return mediaPath;
+            }
+            
+            // If path already has api/posts/media, don't add it again
+            if (mediaPath.includes('api/posts/media')) {
+                return `${serverBaseUrl}/${mediaPath}`;
+            }
+            
+            // Otherwise construct the full URL
+            return `${serverBaseUrl}/api/posts/media/${mediaPath}`;
+        };
+
         return (
             <MotionCard
                 initial={{ opacity: 0, y: 20 }}
@@ -196,9 +266,10 @@ const Feed = () => {
                 sx={{
                     mb: 3,
                     borderRadius: 3,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    overflow: 'hidden',
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                     '&:hover': {
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                        boxShadow: '0 12px 28px rgba(0,0,0,0.12)',
                         transform: 'translateY(-4px)',
                         transition: 'all 0.3s ease-in-out'
                     },
@@ -211,63 +282,281 @@ const Feed = () => {
                     } : {})
                 }}
             >
-                <Box sx={{ display: 'flex', p: 3 }}>
-                    {/* Voting Section */}
-                    <Box sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        pr: 3,
-                        borderRight: '1px solid rgba(0,0,0,0.1)',
-                        minWidth: '60px'
+                {/* Media Content - Moved to top for visual prominence */}
+                {post.media && post.media.length > 0 && (
+                    <Box sx={{ 
+                        position: 'relative', 
+                        backgroundColor: 'rgba(0,0,0,0.02)',
+                        width: '100%'
                     }}>
-                        <Tooltip title="Upvote" arrow>
-                            <IconButton
-                                size="medium"
-                                onClick={() => handleVote(1)}
-                                sx={{ 
-                                    color: userVote === 1 ? 'primary.main' : 'action.disabled',
-                                    '&:hover': { color: 'primary.main', transform: 'scale(1.1)' }
-                                }}
-                            >
-                                <ArrowUpwardIcon fontSize="medium" />
-                            </IconButton>
-                        </Tooltip>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                fontWeight: 'bold',
-                                color: userVote === 1 ? 'primary.main' : 
-                                       userVote === -1 ? 'error.main' : 
-                                       'text.primary'
-                            }}
-                        >
-                            {votes}
-                        </Typography>
-                        <Tooltip title="Downvote" arrow>
-                            <IconButton
-                                size="medium"
-                                onClick={() => handleVote(-1)}
-                                sx={{ 
-                                    color: userVote === -1 ? 'error.main' : 'action.disabled',
-                                    '&:hover': { color: 'error.main', transform: 'scale(1.1)' }
-                                }}
-                            >
-                                <ArrowDownwardIcon fontSize="medium" />
-                            </IconButton>
-                        </Tooltip>
-                        {votes > 10 && (
-                            <Tooltip title="Trending" arrow>
-                                <LocalFireDepartmentIcon 
-                                    sx={{ 
-                                        color: 'orange',
-                                        mt: 1,
-                                        animation: 'pulse 2s infinite'
-                                    }} 
-                                />
-                            </Tooltip>
+                        {/* If there's only one media item */}
+                        {post.media.length === 1 ? (
+                            <Box sx={{ 
+                                overflow: 'hidden', 
+                                height: 'auto', 
+                                minHeight: '200px',
+                                maxHeight: '500px',
+                                position: 'relative',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                borderBottom: '1px solid rgba(0,0,0,0.06)'
+                            }}>
+                                {post.media[0].type === 'image' ? (
+                                    <>
+                                        {!imageError ? (
+                                            <Box 
+                                                sx={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    position: 'relative',
+                                                    p: 1
+                                                }}
+                                            >
+                                                <Box
+                                                    component="img"
+                                                    src={getMediaUrl(post.media[0].url)}
+                                                    alt="Post media"
+                                                    sx={{
+                                                        width: 'auto',
+                                                        maxWidth: '100%',
+                                                        maxHeight: '500px',
+                                                        objectFit: 'contain',
+                                                        display: 'block',
+                                                        transition: 'transform 0.5s ease',
+                                                        '&:hover': {
+                                                            transform: 'scale(1.02)'
+                                                        }
+                                                    }}
+                                                    onError={handleImageError}
+                                                    loading="lazy"
+                                                />
+                                            </Box>
+                                        ) : (
+                                            <Box
+                                                sx={{
+                                                    width: '100%',
+                                                    height: '200px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'rgba(0,0,0,0.05)',
+                                                }}
+                                            >
+                                                <Typography color="text.secondary">
+                                                    Unable to load image
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </>
+                                ) : post.media[0].type === 'video' ? (
+                                    <Box
+                                        component="video"
+                                        src={getMediaUrl(post.media[0].url)}
+                                        controls
+                                        sx={{
+                                            width: 'auto',
+                                            height: 'auto',
+                                            maxWidth: '100%',
+                                            maxHeight: '500px',
+                                            backgroundColor: 'rgba(0,0,0,0.03)',
+                                        }}
+                                        onError={(e) => {
+                                            console.error('Error loading video:', {
+                                                src: e.target.src,
+                                                error: e
+                                            });
+                                        }}
+                                    />
+                                ) : (
+                                    <Box sx={{ 
+                                        p: 3, 
+                                        textAlign: 'center',
+                                        backgroundColor: 'rgba(0,0,0,0.03)',
+                                    }}>
+                                        <Typography color="text.secondary">
+                                            Media attachment (unsupported format)
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        ) : (
+                            // If there are multiple media items, show them in a grid with improved styling
+                            <Grid container spacing={0}>
+                                {post.media.slice(0, 4).map((media, index) => {
+                                    const isShowingPartial = post.media.length > 4 && index === 3;
+                                    
+                                    return (
+                                        <Grid item xs={post.media.length === 2 ? 6 : post.media.length >= 3 ? 6 : 12} key={index} 
+                                              sx={{ 
+                                                  position: 'relative',
+                                                  height: post.media.length <= 2 ? '300px' : '220px',
+                                                  overflow: 'hidden',
+                                                  border: '1px solid rgba(0,0,0,0.06)',
+                                              }}>
+                                            {media.type === 'image' ? (
+                                                <Box
+                                                    sx={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        display: 'flex',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        position: 'relative',
+                                                        padding: '4px',
+                                                    }}
+                                                >
+                                                    <Box
+                                                        component="img"
+                                                        src={getMediaUrl(media.url)}
+                                                        alt={`Post media ${index + 1}`}
+                                                        sx={{
+                                                            maxWidth: '100%',
+                                                            maxHeight: '100%',
+                                                            objectFit: 'contain',
+                                                            transition: 'transform 0.5s ease',
+                                                            '&:hover': {
+                                                                transform: 'scale(1.05)'
+                                                            }
+                                                        }}
+                                                        onError={(e) => {
+                                                            console.error(`Error loading image ${index}:`, {
+                                                                url: media.url,
+                                                                fullUrl: e.target.src,
+                                                                error: e
+                                                            });
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Available';
+                                                        }}
+                                                        loading="lazy"
+                                                    />
+                                                </Box>
+                                            ) : media.type === 'video' ? (
+                                                <Box
+                                                    component="video"
+                                                    src={getMediaUrl(media.url)}
+                                                    controls
+                                                    sx={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Box sx={{ 
+                                                    height: '100%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'rgba(0,0,0,0.05)',
+                                                }}>
+                                                    <Typography color="text.secondary">
+                                                        Unsupported format
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                            
+                                            {/* Overlay for showing "more images" indicator */}
+                                            {isShowingPartial && (
+                                                <Box 
+                                                    sx={{
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        backgroundColor: 'rgba(0,0,0,0.5)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <Typography variant="h6" color="white" fontWeight="bold">
+                                                        +{post.media.length - 3} more
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Grid>
+                                    );
+                                })}
+                            </Grid>
                         )}
                     </Box>
+                )}
+
+                <Box sx={{ display: 'flex', p: 3 }}>
+                    {/* Voting Section - Improved styling */}
+                    <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        pr: 3,
+        borderRight: '1px solid rgba(0,0,0,0.1)',
+        minWidth: '60px'
+    }}>
+        <Tooltip title="Upvote" arrow>
+            <IconButton
+                size="medium"
+                onClick={() => handleVote(1)}
+                sx={{ 
+                    color: userVote === 1 ? 'primary.main' : 'action.disabled',
+                    '&:hover': { color: 'primary.main', transform: 'scale(1.1)' }
+                }}
+            >
+                <ArrowUpwardIcon fontSize="medium" />
+            </IconButton>
+        </Tooltip>
+
+        <Box sx={{ textAlign: 'center', mt: 1, mb: 1 }}>
+            <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                    color: 'primary.main', 
+                    fontWeight: 600 
+                }}
+            >
+                ↑ {upvotes}
+            </Typography>
+            <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                    color: 'error.main', 
+                    fontWeight: 600 
+                }}
+            >
+                ↓ {downvotes}
+            </Typography>
+        </Box>
+
+        <Tooltip title="Downvote" arrow>
+            <IconButton
+                size="medium"
+                onClick={() => handleVote(-1)}
+                sx={{ 
+                    color: userVote === -1 ? 'error.main' : 'action.disabled',
+                    '&:hover': { color: 'error.main', transform: 'scale(1.1)' }
+                }}
+            >
+                <ArrowDownwardIcon fontSize="medium" />
+            </IconButton>
+        </Tooltip>
+
+        {(upvotes - downvotes) > 10 && (
+            <Tooltip title="Trending" arrow>
+                <LocalFireDepartmentIcon 
+                    sx={{ 
+                        color: 'orange',
+                        mt: 1,
+                        animation: 'pulse 2s infinite'
+                    }} 
+                />
+            </Tooltip>
+        )}
+    </Box>
+
 
                     {/* Main Content */}
                     <Box sx={{ flex: 1, pl: 3 }}>
@@ -276,10 +565,11 @@ const Feed = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                                 <Avatar 
                                     sx={{ 
-                                        width: 32, 
-                                        height: 32, 
+                                        width: 36, 
+                                        height: 36, 
                                         bgcolor: avatarColor,
-                                        fontSize: '1rem'
+                                        fontSize: '1rem',
+                                        fontWeight: 'bold'
                                     }}
                                 >
                                     {post.authorName.charAt(0)}
@@ -287,6 +577,22 @@ const Feed = () => {
                                 <Typography variant="subtitle2" color="text.secondary">
                                     {post.authorName} • {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
                                 </Typography>
+                                {post.isScammer && (
+        <Tooltip title="This user has a high number of downvoted posts. Use caution.">
+            <Chip
+                icon={<WarningAmberIcon />}
+                label="Scammer Risk"
+                color="error"
+                size="small"
+                sx={{
+                    fontWeight: 600,
+                    backgroundColor: '#fdecea',
+                    color: '#b71c1c',
+                    borderRadius: 2
+                }}
+            />
+        </Tooltip>
+    )}
                                 <Chip 
                                     label={post.category}
                                     size="small"
@@ -302,7 +608,7 @@ const Feed = () => {
                                     }}
                                 />
                             </Box>
-                            <Typography variant="h5" sx={{ fontSize: '1.25rem', fontWeight: 700, mb: 1 }}>
+                            <Typography variant="h5" sx={{ fontSize: '1.35rem', fontWeight: 700, mb: 1, lineHeight: 1.3 }}>
                                 {post.title}
                             </Typography>
                         </Box>
@@ -311,14 +617,14 @@ const Feed = () => {
                         <Typography 
                             variant="body1" 
                             color="text.secondary" 
-                            sx={{ mb: 2 }}
+                            sx={{ mb: 2, lineHeight: 1.6 }}
                             className="post-content"
                         >
                             {post.content}
                         </Typography>
 
                         {/* Location */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                             <LocationOnIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
                             <Typography variant="body2" color="text.secondary">
                                 {post.location}
@@ -467,7 +773,7 @@ const Feed = () => {
         <Box sx={{ 
             p: { xs: 2, sm: 3, md: 4 },
             pt: { xs: 8, sm: 9, md: 10 },
-            backgroundColor: '#F5F6F7',
+            backgroundColor: '#F8F9FB',
             minHeight: '100vh'
         }}>
             <MotionContainer 
@@ -476,7 +782,7 @@ const Feed = () => {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
             >
-                {/* Header Section */}
+                {/* Header Section - Improved UI */}
                 <Box sx={{ 
                     display: 'flex', 
                     flexDirection: { xs: 'column', sm: 'row' },
@@ -484,13 +790,18 @@ const Feed = () => {
                     alignItems: { xs: 'stretch', sm: 'center' },
                     gap: 3,
                     mb: 4,
-                    px: 2
+                    px: 2,
+                    pb: 4,
+                    borderBottom: '1px solid rgba(0,0,0,0.08)'
                 }}>
                     <Box>
                         <Typography variant="h3" sx={{ 
                             fontSize: { xs: '2rem', sm: '2.5rem' },
-                            fontWeight: 700,
-                            mb: 1
+                            fontWeight: 800,
+                            mb: 1,
+                            background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent'
                         }}>
                             Community Feed
                         </Typography>
@@ -520,6 +831,7 @@ const Feed = () => {
                                 backgroundColor: 'white',
                                 borderRadius: '30px',
                                 minWidth: '250px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                                 '& .MuiOutlinedInput-root': {
                                     borderRadius: '30px',
                                 }
@@ -534,7 +846,13 @@ const Feed = () => {
                                     textTransform: 'none',
                                     borderRadius: '30px',
                                     whiteSpace: 'nowrap',
-                                    px: 3
+                                    px: 3,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                    borderColor: 'rgba(0,0,0,0.15)',
+                                    '&:hover': {
+                                        borderColor: 'primary.main',
+                                        backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                                    }
                                 }}
                             >
                                 Sort By
@@ -546,7 +864,12 @@ const Feed = () => {
                                 sx={{ 
                                     textTransform: 'none',
                                     borderRadius: '30px',
-                                    px: 3
+                                    px: 3,
+                                    background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
+                                    boxShadow: '0 4px 10px rgba(26, 35, 126, 0.3)',
+                                    '&:hover': {
+                                        boxShadow: '0 6px 12px rgba(26, 35, 126, 0.4)',
+                                    }
                                 }}
                             >
                                 Refresh
@@ -569,7 +892,17 @@ const Feed = () => {
                         sx={{
                             '& .MuiTab-root': {
                                 textTransform: 'none',
-                                minWidth: 100
+                                minWidth: 120,
+                                fontWeight: 600,
+                                fontSize: '1rem'
+                            },
+                            '& .Mui-selected': {
+                                color: '#1a237e',
+                            },
+                            '& .MuiTabs-indicator': {
+                                backgroundColor: '#1a237e',
+                                height: 3,
+                                borderRadius: '3px 3px 0 0'
                             }
                         }}
                     >
@@ -593,9 +926,15 @@ const Feed = () => {
                             <Switch
                                 checked={viewMode === 'compact'}
                                 onChange={(e) => setViewMode(e.target.checked ? 'compact' : 'card')}
+                                color="primary"
                             />
                         }
                         label="Compact View"
+                        sx={{
+                            '& .MuiFormControlLabel-label': {
+                                fontWeight: 500
+                            }
+                        }}
                     />
                 </Box>
 

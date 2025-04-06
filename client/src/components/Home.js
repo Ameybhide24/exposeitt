@@ -78,7 +78,7 @@ const Home = () => {
                                 fontSize: { xs: '2.5rem', md: '3.5rem' }
                             }}
                         >
-                            Welcome to Whistleblower
+                            Welcome to ExposeIt
                         </Typography>
                     </motion.div>
                     <Typography 

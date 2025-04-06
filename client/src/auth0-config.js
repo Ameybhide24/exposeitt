@@ -10,8 +10,8 @@ export const auth0Config = {
         },
         displayName: 'Whistleblower App',
         languageDictionary: {
-            title: 'Login to continue to Whistleblower App',
-            signUpTitle: 'Sign up for Whistleblower App',
+            title: 'Login to continue to ExposeIt App',
+            signUpTitle: 'Sign up for ExposeIt App',
             loginSubmitLabel: 'Continue',
             forgotPasswordTitle: 'Reset your password',
         },

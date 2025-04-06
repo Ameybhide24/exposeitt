@@ -114,7 +114,7 @@ const Navbar = () => {
                                 letterSpacing: '-0.02em',
                             }}
                         >
-                            Whistleblower
+                            ExposeIt
                         </Typography>
                     </Box>
 

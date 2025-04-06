@@ -45,6 +45,18 @@ const postSchema = new mongoose.Schema({
         set: encrypt,
         get: decrypt
     },
+    media: [{
+        url: {
+            type: String,
+            set: encrypt,
+            get: decrypt
+        },
+        type: {
+            type: String,
+            enum: ['image', 'video', null],
+            default: null
+        }
+    }],
     userId: {
         type: String,
         required: true,
@@ -70,7 +82,9 @@ const postSchema = new mongoose.Schema({
         type: String,
         enum: ['posted', 'reported'],
         default: 'posted'
-    }
+    },
+    upvotes: { type: Number, default: 0 },
+    downvotes: { type: Number, default: 0 },
 }, {
     timestamps: true,
     toJSON: { getters: true },
