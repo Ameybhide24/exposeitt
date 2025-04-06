@@ -8,6 +8,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+
+
 // Auth0 middleware
 const checkJwt = auth({
     audience: process.env.AUTH0_AUDIENCE,
@@ -106,9 +108,7 @@ const upload = multer({
 router.get('/feed', async (req, res) => {
     try {
         console.log('Fetching feed posts');
-        const posts = await Post.find({})
-            .sort({ createdAt: -1 });
-
+        const posts = await Post.find({}).sort({ createdAt: -1 });
         console.log(`Found ${posts.length} posts for feed`);
 
         // Anonymize user data
@@ -179,6 +179,7 @@ router.get('/feed', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // Get all approved posts
 router.get('/', async (req, res) => {

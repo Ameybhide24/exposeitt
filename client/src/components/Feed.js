@@ -166,7 +166,7 @@ const Feed = () => {
     }, [posts, searchTerm, sortBy]);
 
     const PostCard = ({ post }) => {
-        const [votes, setVotes] = useState(0);
+
         const [userVote, setUserVote] = useState(null);
         const [menuAnchorEl, setMenuAnchorEl] = useState(null);
         const isSaved = savedPosts.has(post._id);
@@ -204,6 +204,8 @@ const Feed = () => {
                 console.error("Failed to vote:", err);
             }
         };
+        
+        
 
         const handleMenuClick = (event) => {
             setMenuAnchorEl(event.currentTarget);
@@ -556,7 +558,6 @@ const Feed = () => {
             </Tooltip>
         )}
     </Box>
-
 
                     {/* Main Content */}
                     <Box sx={{ flex: 1, pl: 3 }}>

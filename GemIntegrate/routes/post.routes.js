@@ -6,9 +6,7 @@ const upload = multer({ dest: "uploads/" });
 const TranscriptionController = require('../controller/transcription.controller');
 const PostService = require('../services/post.service')
 
-
 router.post('/generate', (req, res) => {
-      console.log("inside this");
       PostController.generatePost(req, res);
 });
 

@@ -4,8 +4,8 @@ const PostController = {
   generatePost: async (req, res) => {
     try {
       
-      console.log(req.body);
       const socialMediaPost = await PostService.generateSocialMediaPost(req.body);
+      console.log(socialMediaPost);
       res.json({ success: true, post: socialMediaPost });
       
     } catch (error) {
