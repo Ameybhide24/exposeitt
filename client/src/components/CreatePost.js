@@ -182,6 +182,99 @@ const CreatePost = () => {
         }
     };
 
+    // const handleSubmit = async (e) => {
+    //     if (e) e.preventDefault();
+        
+    //     // Validate all required fields
+    //     if (!title || !content || !category || !location) {
+    //         console.log('Validation failed:', { 
+    //             title: !!title, 
+    //             content: !!content, 
+    //             category: !!category, 
+    //             location: !!location,
+    //             locationValue: location 
+    //         });
+    //         setError('Please fill in all required fields');
+    //         return;
+    //     }
+
+    //     setIsSubmitting(true);
+    //     setError('');
+
+    //     try {
+    //         const token = await getAccessTokenSilently();
+            
+    //         if (!user?.sub) {
+    //             setError('Authentication error. Please try logging in again.');
+    //             return;
+    //         }
+
+    //         // First ensure user exists in database
+    //         await axios.post(
+    //             'http://localhost:5050/api/users',
+    //             {
+    //                 email: user.email,
+    //                 name: user.name,
+    //                 picture: user.picture
+    //             },
+    //             {
+    //                 headers: {
+    //                     Authorization: `Bearer ${token}`,
+    //                     'Content-Type': 'application/json'
+    //                 },
+    //             }
+    //         );
+
+    //         // Prepare post data with explicit string conversion
+    //         const postData = {
+    //             title: String(title).trim(),
+    //             content: String(content).trim(),
+    //             category: String(category).trim(),
+    //             location: String(location).trim(),
+    //             userId: user.sub,
+    //             authorName: user.name,
+    //             authorEmail: user.email
+    //         };
+
+    //         console.log('Post data before submission:', {
+    //             ...postData,
+    //             locationLength: postData.location.length,
+    //             locationType: typeof postData.location
+    //         });
+
+    //         // Submit the post
+    //         const response = await axios.post(
+    //             'http://localhost:5050/api/posts',
+    //             postData,
+    //             {
+    //                 headers: {
+    //                     Authorization: `Bearer ${token}`,
+    //                     'Content-Type': 'application/json'
+    //                 },
+    //             }
+    //         );
+
+    //         console.log('Post creation successful:', response.data);
+
+    //         // Clear form and redirect
+    //         setTitle('');
+    //         setContent('');
+    //         setCategory('');
+    //         setLocation('');
+    //         navigate('/dashboard', { replace: true });
+    //     } catch (err) {
+    //         console.error('Error details:', {
+    //             message: err.message,
+    //             response: err.response?.data,
+    //             status: err.response?.status,
+    //             data: err.response?.data?.errors,
+    //             requestData: err.config?.data
+    //         });
+    //         setError(err.response?.data?.message || 'Failed to submit report. Please try again.');
+    //     } finally {
+    //         setIsSubmitting(false);
+    //     }
+    // };
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         
@@ -198,10 +291,10 @@ const CreatePost = () => {
             setError('Please fill in all required fields');
             return;
         }
-
+    
         setIsSubmitting(true);
         setError('');
-
+    
         try {
             const token = await getAccessTokenSilently();
             
@@ -209,8 +302,8 @@ const CreatePost = () => {
                 setError('Authentication error. Please try logging in again.');
                 return;
             }
-
-            // First ensure user exists in database
+    
+            // First ensure user exists in the database
             await axios.post(
                 'http://localhost:5050/api/users',
                 {
@@ -246,9 +339,30 @@ const CreatePost = () => {
                 authorEmail: user.email,
                 isEnhanced: false
             };
+    
+            console.log('Post data before submission:', {
+                ...postData,
+                locationLength: postData.location.length,
+                locationType: typeof postData.location
+            });
+    
+            // Check if description is relevant before submitting the post
+            const relevanceAssessment = await axios.post(
+                'http://localhost:9000/api/posts/assess-description',
+                { description: postData.content },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                }
+            );
+            console.log(relevanceAssessment, "here it issssss");
+            if (relevanceAssessment.data.isRelevant === "no") {
+                setError("This description does not pertain to a crime.");
 
-            console.log('Post data before submission:', postData);
-
+                return;
+            }
+    
             // Submit the post
             const response = await axios.post(
                 'http://localhost:5050/api/posts',
@@ -260,9 +374,9 @@ const CreatePost = () => {
                     },
                 }
             );
-
+    
             console.log('Post creation successful:', response.data);
-
+    
             // Clear form and redirect
             setTitle('');
             setContent('');

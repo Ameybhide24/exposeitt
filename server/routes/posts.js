@@ -42,40 +42,93 @@ const getPoliceDepartmentEmail = (location) => {
 };
 
 // Get feed (all posts with anonymized user data) - Public route
+// router.get('/feed', async (req, res) => {
+//     try {
+//         console.log('Fetching feed posts');
+//         const posts = await Post.find({})
+//             .sort({ createdAt: -1 });
+
+//         console.log(`Found ${posts.length} posts for feed`);
+
+//         // Anonymize user data
+//         const anonymizedPosts = posts.map(post => {
+//             const anonymousId = generateAnonymousId(post.userId);
+//             return {
+//                 ...post.toObject({ getters: true }),
+//                 authorName: `Anonymous User ${anonymousId}`,
+//                 authorEmail: undefined, // Remove email for privacy
+//                 userId: undefined // Remove actual userId for privacy
+//             };
+//         });
+
+//         res.json(anonymizedPosts);
+//     } catch (err) {
+//         console.error('Error fetching feed:', err);
+//         res.status(500).json({ message: err.message });
+//     }
+// });
+
+
+const axios = require('axios');
+
+const randomNames = [
+    'Gotham', 'Metropolis', 'Atlantis', 'Hogwarts', 'Narnia', 'Wakanda',
+    'Springfield', 'Rivendell', 'Asgard', 'Pandora', 'Zion', 'Neverland'
+];
+
+// Helper function to get a random name
+const getRandomName = () => {
+    const randomIndex = Math.floor(Math.random() * randomNames.length);
+    return randomNames[randomIndex];
+};
+
+// Helper function to generate a 4-digit random number
+const getRandomNumber = () => {
+    return Math.floor(1000 + Math.random() * 9000); // Generates a number between 1000 and 9999
+};
 router.get('/feed', async (req, res) => {
     try {
         console.log('Fetching feed posts');
-        const posts = await Post.find({})
-            .sort({ createdAt: -1 });
-
+        const posts = await Post.find({}).sort({ createdAt: -1 });
         console.log(`Found ${posts.length} posts for feed`);
 
-        const enrichedPosts = await Promise.all(
+        // Anonymize user data using Midnight API
+        const anonymizedPosts = await Promise.all(
             posts.map(async (post) => {
-                const anonymousId = generateAnonymousId(post.userId);
+                try {
+                    // Generate a unique salt for the user
+                    // const salt = generateSaltForUser(post.userId);
+                    // const consistencyCheck = transientCommit('PostType', post.content + salt, BigInt(0)); // Use appropriate CompactType and opening value
 
-                // Fetch recent 5 posts from the same user
-                const recentPosts = await Post.find({ userId: post.userId })
-                    .sort({ createdAt: -1 })
-                    .limit(5);
+                    // Call Midnight API to anonymize user data
+                    const response = await axios.post('https://rpc.testnet-02.midnight.network/', {
+                        jsonrpc: "2.0",
+                        method: "system_chain", // Hypothetical method for anonymization
+                        params: [], // Include salt for uniqueness
+                        id: 1
+                    });
 
-                let upvoteSum = 0;
-                let downvoteSum = 0;
-
-                recentPosts.forEach(p => {
-                    upvoteSum += p.upvotes || 0;
-                    downvoteSum += p.downvotes || 0;
-                });
-
-                const isScammer = downvoteSum > 3 * upvoteSum;
-
-                return {
-                    ...post.toObject({ getters: true }),
-                    authorName: `Anonymous User ${anonymousId}`,
-                    authorEmail: undefined,
-                    userId: undefined,
-                    isScammer
-                };
+                    // Retrieve a unique identifier from the response
+                    console.log('Midnight API Response:', response.data);
+                    const anonymousId = response.data.result.anonymousId ;
+                    const randomName = getRandomName();
+                    const randomNumber = getRandomNumber();
+                    // const uniqueHash = generateUniqueHash(post.userId + anonymousId);
+                    return {
+                        ...post.toObject({ getters: true }),
+                        authorName: `${randomName}-${randomNumber}`, // Add unique ID
+                        authorEmail: undefined, // Remove email for privacy
+                        userId: undefined // Remove actual userId for privacy
+                    };
+                } catch (error) {
+                    console.error('Error anonymizing user with Midnight API:', error);
+                    return {
+                        ...post.toObject({ getters: true }),
+                        authorName: 'Anonymous- user',
+                        authorEmail: undefined,
+                        userId: undefined
+                    };
+                }
             })
         );
 
