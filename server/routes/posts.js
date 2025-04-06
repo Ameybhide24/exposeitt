@@ -5,6 +5,8 @@ const { auth } = require('express-oauth2-jwt-bearer');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
+
+
 // Auth0 middleware
 const checkJwt = auth({
     audience: process.env.AUTH0_AUDIENCE,
@@ -41,94 +43,88 @@ const getPoliceDepartmentEmail = (location) => {
     return locationMap[city] || locationMap.default;
 };
 
-// Get feed (all posts with anonymized user data) - Public route
-// router.get('/feed', async (req, res) => {
-//     try {
-//         console.log('Fetching feed posts');
-//         const posts = await Post.find({})
-//             .sort({ createdAt: -1 });
-
-//         console.log(`Found ${posts.length} posts for feed`);
-
-//         // Anonymize user data
-//         const anonymizedPosts = posts.map(post => {
-//             const anonymousId = generateAnonymousId(post.userId);
-//             return {
-//                 ...post.toObject({ getters: true }),
-//                 authorName: `Anonymous User ${anonymousId}`,
-//                 authorEmail: undefined, // Remove email for privacy
-//                 userId: undefined // Remove actual userId for privacy
-//             };
-//         });
-
-//         res.json(anonymizedPosts);
-//     } catch (err) {
-//         console.error('Error fetching feed:', err);
-//         res.status(500).json({ message: err.message });
-//     }
-// });
 
 
 const axios = require('axios');
-
+ 
 const randomNames = [
     'Gotham', 'Metropolis', 'Atlantis', 'Hogwarts', 'Narnia', 'Wakanda',
     'Springfield', 'Rivendell', 'Asgard', 'Pandora', 'Zion', 'Neverland'
 ];
 
-// Helper function to get a random name
+// Helper to get a random name
 const getRandomName = () => {
     const randomIndex = Math.floor(Math.random() * randomNames.length);
     return randomNames[randomIndex];
 };
 
-// Helper function to generate a 4-digit random number
+// Helper to generate a 4-digit number
 const getRandomNumber = () => {
-    return Math.floor(1000 + Math.random() * 9000); // Generates a number between 1000 and 9999
+    return Math.floor(1000 + Math.random() * 9000);
 };
+
+const userAnonMap = new Map();
+
 router.get('/feed', async (req, res) => {
     try {
         console.log('Fetching feed posts');
         const posts = await Post.find({}).sort({ createdAt: -1 });
         console.log(`Found ${posts.length} posts for feed`);
 
-        // Anonymize user data using Midnight API
-        const anonymizedPosts = await Promise.all(
+        const enrichedPosts = await Promise.all(
             posts.map(async (post) => {
-                try {
-                    // Generate a unique salt for the user
-                    // const salt = generateSaltForUser(post.userId);
-                    // const consistencyCheck = transientCommit('PostType', post.content + salt, BigInt(0)); // Use appropriate CompactType and opening value
+                const userId = post.userId.toString();
 
-                    // Call Midnight API to anonymize user data
+                // If already mapped, reuse the same anonymous name
+                if (!userAnonMap.has(userId)) {
+                    const randomName = getRandomName();
+                    const randomNumber = getRandomNumber();
+                    const anonymousName = `${randomName}-${randomNumber}`;
+                    userAnonMap.set(userId, anonymousName);
+                }
+
+                const authorName = userAnonMap.get(userId);
+
+                let anonymousId = 'anon';
+
+                try {
                     const response = await axios.post('https://rpc.testnet-02.midnight.network/', {
                         jsonrpc: "2.0",
-                        method: "system_chain", // Hypothetical method for anonymization
-                        params: [], // Include salt for uniqueness
+                        method: "system_chain",
+                        params: [],
                         id: 1
                     });
 
-                    // Retrieve a unique identifier from the response
-                    console.log('Midnight API Response:', response.data);
-                    const anonymousId = response.data.result.anonymousId ;
-                    const randomName = getRandomName();
-                    const randomNumber = getRandomNumber();
-                    // const uniqueHash = generateUniqueHash(post.userId + anonymousId);
-                    return {
-                        ...post.toObject({ getters: true }),
-                        authorName: `${randomName}-${randomNumber}`, // Add unique ID
-                        authorEmail: undefined, // Remove email for privacy
-                        userId: undefined // Remove actual userId for privacy
-                    };
+                    if (response.data && response.data.result) {
+                        anonymousId = response.data.result.anonymousId || 'anon';
+                    }
                 } catch (error) {
-                    console.error('Error anonymizing user with Midnight API:', error);
-                    return {
-                        ...post.toObject({ getters: true }),
-                        authorName: 'Anonymous- user',
-                        authorEmail: undefined,
-                        userId: undefined
-                    };
+                    console.error('Midnight API anonymization failed:', error.message);
                 }
+
+                // Scam detection
+                const recentPosts = await Post.find({ userId: post.userId })
+                    .sort({ createdAt: -1 })
+                    .limit(5);
+
+                let upvoteSum = 0;
+                let downvoteSum = 0;
+
+                recentPosts.forEach(p => {
+                    upvoteSum += p.upvotes || 0;
+                    downvoteSum += p.downvotes || 0;
+                });
+
+                const isScammer = downvoteSum > 3 * upvoteSum;
+
+                return {
+                    ...post.toObject({ getters: true }),
+                    authorName,
+                    anonymousId,
+                    authorEmail: undefined,
+                    userId: undefined,
+                    isScammer
+                };
             })
         );
 
@@ -293,7 +289,7 @@ router.post('/upvote/:id', async (req, res) => {
   try {
     const post = await Post.findByIdAndUpdate(
       req.params.id,
-      { $inc: { upvotes: 1 } },
+      { $inc: { upvotes: 1 }, $dec: {downvotes: -1} },
       { new: true }
     );
     res.json(post);
@@ -307,7 +303,7 @@ router.post('/downvote/:id', async (req, res) => {
   try {
     const post = await Post.findByIdAndUpdate(
       req.params.id,
-      { $inc: { downvotes: 1 } },
+      { $inc: { downvotes: 1 }, $dec: {upvotes: -1} },
       { new: true }
     );
     res.json(post);

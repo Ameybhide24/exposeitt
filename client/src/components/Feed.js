@@ -156,7 +156,9 @@ const Feed = () => {
     }, [posts, searchTerm, sortBy]);
 
     const PostCard = ({ post }) => {
-        const [votes, setVotes] = useState(post.upvotes - post.downvotes || 0);
+        const [upvotes, setUpvotes] = useState(post.upvotes || 0);
+        const [downvotes, setDownvotes] = useState(post.downvotes || 0);
+
         const [userVote, setUserVote] = useState(null);
         const [menuAnchorEl, setMenuAnchorEl] = useState(null);
         const isSaved = savedPosts.has(post._id);
@@ -165,7 +167,6 @@ const Feed = () => {
             const postId = post._id;
         
             try {
-
                 let updatedPost;
         
                 if (direction === 1) {
@@ -176,13 +177,14 @@ const Feed = () => {
                     updatedPost = res.data;
                 }
         
-                // Update votes from backend response
-                setVotes(updatedPost.upvotes - updatedPost.downvotes);
+                setUpvotes(updatedPost.upvotes || 0);
+                setDownvotes(updatedPost.downvotes || 0);
                 setUserVote(direction);
             } catch (err) {
                 console.error("Failed to vote:", err);
             }
         };
+        
         
 
         const handleMenuClick = (event) => {
@@ -228,62 +230,74 @@ const Feed = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', p: 3 }}>
-                    {/* Voting Section */}
-                    <Box sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        pr: 3,
-                        borderRight: '1px solid rgba(0,0,0,0.1)',
-                        minWidth: '60px'
-                    }}>
-                        <Tooltip title="Upvote" arrow>
-                            <IconButton
-                                size="medium"
-                                onClick={() => handleVote(1)}
-                                sx={{ 
-                                    color: userVote === 1 ? 'primary.main' : 'action.disabled',
-                                    '&:hover': { color: 'primary.main', transform: 'scale(1.1)' }
-                                }}
-                            >
-                                <ArrowUpwardIcon fontSize="medium" />
-                            </IconButton>
-                        </Tooltip>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                fontWeight: 'bold',
-                                color: userVote === 1 ? 'primary.main' : 
-                                       userVote === -1 ? 'error.main' : 
-                                       'text.primary'
-                            }}
-                        >
-                            {votes}
-                        </Typography>
-                        <Tooltip title="Downvote" arrow>
-                            <IconButton
-                                size="medium"
-                                onClick={() => handleVote(-1)}
-                                sx={{ 
-                                    color: userVote === -1 ? 'error.main' : 'action.disabled',
-                                    '&:hover': { color: 'error.main', transform: 'scale(1.1)' }
-                                }}
-                            >
-                                <ArrowDownwardIcon fontSize="medium" />
-                            </IconButton>
-                        </Tooltip>
-                        {votes > 10 && (
-                            <Tooltip title="Trending" arrow>
-                                <LocalFireDepartmentIcon 
-                                    sx={{ 
-                                        color: 'orange',
-                                        mt: 1,
-                                        animation: 'pulse 2s infinite'
-                                    }} 
-                                />
-                            </Tooltip>
-                        )}
-                    </Box>
+    {/* Voting Section */}
+    <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        pr: 3,
+        borderRight: '1px solid rgba(0,0,0,0.1)',
+        minWidth: '60px'
+    }}>
+        <Tooltip title="Upvote" arrow>
+            <IconButton
+                size="medium"
+                onClick={() => handleVote(1)}
+                sx={{ 
+                    color: userVote === 1 ? 'primary.main' : 'action.disabled',
+                    '&:hover': { color: 'primary.main', transform: 'scale(1.1)' }
+                }}
+            >
+                <ArrowUpwardIcon fontSize="medium" />
+            </IconButton>
+        </Tooltip>
+
+        <Box sx={{ textAlign: 'center', mt: 1, mb: 1 }}>
+            <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                    color: 'primary.main', 
+                    fontWeight: 600 
+                }}
+            >
+                ↑ {upvotes}
+            </Typography>
+            <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                    color: 'error.main', 
+                    fontWeight: 600 
+                }}
+            >
+                ↓ {downvotes}
+            </Typography>
+        </Box>
+
+        <Tooltip title="Downvote" arrow>
+            <IconButton
+                size="medium"
+                onClick={() => handleVote(-1)}
+                sx={{ 
+                    color: userVote === -1 ? 'error.main' : 'action.disabled',
+                    '&:hover': { color: 'error.main', transform: 'scale(1.1)' }
+                }}
+            >
+                <ArrowDownwardIcon fontSize="medium" />
+            </IconButton>
+        </Tooltip>
+
+        {(upvotes - downvotes) > 10 && (
+            <Tooltip title="Trending" arrow>
+                <LocalFireDepartmentIcon 
+                    sx={{ 
+                        color: 'orange',
+                        mt: 1,
+                        animation: 'pulse 2s infinite'
+                    }} 
+                />
+            </Tooltip>
+        )}
+    </Box>
 
                     {/* Main Content */}
                     <Box sx={{ flex: 1, pl: 3 }}>
