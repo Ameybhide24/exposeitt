@@ -45,6 +45,43 @@ class PostService {
       throw new Error('Failed to process the crime report');
     }
   }
+
+  static async assessDescriptionRelevance(userDescription) {
+    const prompt = `
+    Please assess the following description for its relevance to crime reporting. 
+    Respond with a JSON object containing the following field:
+
+    1. isRelevant: "yes" if this description pertains to crime reporting, otherwise "no".
+
+    Description: "${userDescription}"
+
+    Response format:
+    {
+        "isRelevant": "yes | no"
+    }
+    `;
+
+    try {
+        // Call Gemini model with the constructed prompt
+        const result = await textModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
+
+        const response = await result.response;
+        const text = response.text();
+
+        // Clean the response before parsing
+        const cleanedResponse = text
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+        console.log(cleanedResponse);
+        return JSON.parse(cleanedResponse); // Return the assessment results
+    } catch (error) {
+        console.error('Error assessing description:', error);
+        throw new Error('Failed to assess description relevance');
+    }
+  }
 }
 
 module.exports = PostService;
