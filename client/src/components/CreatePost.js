@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -31,6 +31,10 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PublishIcon from '@mui/icons-material/Publish';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
+import MicIcon from '@mui/icons-material/Mic';
+import StopIcon from '@mui/icons-material/Stop';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AudioFileIcon from '@mui/icons-material/AudioFile';
 
 const categories = [
     { value: 'Workplace Issues', icon: '🏢', description: 'Report workplace harassment, discrimination, or safety concerns' },
@@ -56,6 +60,11 @@ const CreatePost = () => {
     const { getAccessTokenSilently, user } = useAuth0();
     const navigate = useNavigate();
     const theme = useTheme();
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioBlob, setAudioBlob] = useState(null);
+    const [recordingError, setRecordingError] = useState('');
+    const mediaRecorderRef = useRef(null);
+    const chunksRef = useRef([]);
 
     const handleNext = () => {
         if (activeStep === 0 && (!category || !title || !location)) {
@@ -100,14 +109,88 @@ const CreatePost = () => {
         }
     };
 
+    const startRecording = async () => {
+        try {
+            setRecordingError('');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            chunksRef.current = [];
+
+            mediaRecorderRef.current.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    chunksRef.current.push(e.data);
+                }
+            };
+
+            mediaRecorderRef.current.onstop = () => {
+                const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+                setAudioBlob(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+        } catch (err) {
+            console.error('Error starting recording:', err);
+            setRecordingError('Failed to access microphone. Please ensure you have granted permission.');
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const deleteRecording = () => {
+        setAudioBlob(null);
+        setContent('');
+    };
+
+    const handleAudioTranscription = async () => {
+        if (!audioBlob) return;
+
+        setIsSubmitting(true);
+        setError('');
+
+        try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.wav');
+
+            const token = await getAccessTokenSilently();
+            const response = await axios.post(
+                'http://localhost:9000/api/posts/transcribe-audio',
+                formData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data',
+                    },
+                }
+            );
+
+            if (response.data.success) {
+                setAiEnhancedPost(response.data.post);
+                setActiveStep(3); // Move to Final Review
+            }
+        } catch (err) {
+            console.error('Error transcribing audio:', err);
+            setError('Failed to process audio recording. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         
-        // Validate all required fields
-        if (!title || !content || !category || !location) {
+        // Updated validation to check for either regular content or AI enhanced content
+        if (!title || !category || !location || (!content && !aiEnhancedPost)) {
             console.log('Validation failed:', { 
                 title: !!title, 
-                content: !!content, 
+                content: !!content,
+                aiEnhancedPost: !!aiEnhancedPost,
                 category: !!category, 
                 location: !!location,
                 locationValue: location 
@@ -143,22 +226,28 @@ const CreatePost = () => {
                 }
             );
 
-            // Prepare post data with explicit string conversion
-            const postData = {
+            // Prepare post data - use enhanced data if available, otherwise use original data
+            const postData = aiEnhancedPost ? {
+                title: String(aiEnhancedPost.title).trim(),
+                content: String(aiEnhancedPost.content).trim(),
+                category: String(aiEnhancedPost.category).trim(),
+                location: String(aiEnhancedPost.location).trim(),
+                userId: user.sub,
+                authorName: user.name,
+                authorEmail: user.email,
+                isEnhanced: true
+            } : {
                 title: String(title).trim(),
                 content: String(content).trim(),
                 category: String(category).trim(),
                 location: String(location).trim(),
                 userId: user.sub,
                 authorName: user.name,
-                authorEmail: user.email
+                authorEmail: user.email,
+                isEnhanced: false
             };
 
-            console.log('Post data before submission:', {
-                ...postData,
-                locationLength: postData.location.length,
-                locationType: typeof postData.location
-            });
+            console.log('Post data before submission:', postData);
 
             // Submit the post
             const response = await axios.post(
@@ -179,6 +268,7 @@ const CreatePost = () => {
             setContent('');
             setCategory('');
             setLocation('');
+            setAiEnhancedPost(null);
             navigate('/dashboard', { replace: true });
         } catch (err) {
             console.error('Error details:', {
@@ -250,6 +340,69 @@ const CreatePost = () => {
             case 1:
                 return (
                     <Box sx={{ mt: 3 }}>
+                        <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+                            {!isRecording && !audioBlob && (
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<MicIcon />}
+                                    onClick={startRecording}
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    Start Recording
+                                </Button>
+                            )}
+                            {isRecording && (
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    startIcon={<StopIcon />}
+                                    onClick={stopRecording}
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    Stop Recording
+                                </Button>
+                            )}
+                            {audioBlob && (
+                                <>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <AudioFileIcon color="primary" />
+                                        <Typography>Recording saved</Typography>
+                                    </Box>
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<DeleteIcon />}
+                                        onClick={deleteRecording}
+                                        sx={{ borderRadius: 2 }}
+                                    >
+                                        Delete Recording
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        onClick={handleAudioTranscription}
+                                        disabled={isSubmitting}
+                                        sx={{
+                                            borderRadius: 2,
+                                            background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)',
+                                            '&:hover': {
+                                                background: 'linear-gradient(45deg, #283593 30%, #1a237e 90%)',
+                                            }
+                                        }}
+                                    >
+                                        {isSubmitting ? (
+                                            <CircularProgress size={24} color="inherit" />
+                                        ) : (
+                                            'Process Recording'
+                                        )}
+                                    </Button>
+                                </>
+                            )}
+                        </Box>
+
+                        <Divider sx={{ my: 3 }}>
+                            <Typography color="textSecondary">OR</Typography>
+                        </Divider>
+
                         <TextField
                             fullWidth
                             label="Event Details *"
@@ -328,16 +481,16 @@ const CreatePost = () => {
                                 
                                 {aiEnhancedPost ? (
                                     <>
-                                        <Typography variant="subtitle2" color="primary">Heading</Typography>
+                                        <Typography variant="subtitle2" color="primary">Title</Typography>
                                         {isEditingEnhanced ? (
                                             <TextField
                                                 fullWidth
-                                                value={aiEnhancedPost.heading}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, heading: e.target.value})}
+                                                value={aiEnhancedPost.title}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, title: e.target.value})}
                                                 sx={{ mb: 2 }}
                                             />
                                         ) : (
-                                            <Typography paragraph>{aiEnhancedPost.heading}</Typography>
+                                            <Typography paragraph>{aiEnhancedPost.title}</Typography>
                                         )}
                                         
                                         <Typography variant="subtitle2" color="primary">Category</Typography>
@@ -356,40 +509,26 @@ const CreatePost = () => {
                                         {isEditingEnhanced ? (
                                             <TextField
                                                 fullWidth
-                                                value={aiEnhancedPost.locationTime}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, locationTime: e.target.value})}
+                                                value={aiEnhancedPost.location}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, location: e.target.value})}
                                                 sx={{ mb: 2 }}
                                             />
                                         ) : (
-                                            <Typography paragraph>{aiEnhancedPost.locationTime}</Typography>
+                                            <Typography paragraph>{aiEnhancedPost.location}</Typography>
                                         )}
                                         
-                                        <Typography variant="subtitle2" color="primary">Summary</Typography>
+                                        <Typography variant="subtitle2" color="primary">Content</Typography>
                                         {isEditingEnhanced ? (
                                             <TextField
                                                 fullWidth
                                                 multiline
-                                                rows={3}
-                                                value={aiEnhancedPost.summary}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, summary: e.target.value})}
+                                                rows={4}
+                                                value={aiEnhancedPost.content}
+                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, content: e.target.value})}
                                                 sx={{ mb: 2 }}
                                             />
                                         ) : (
-                                            <Typography paragraph>{aiEnhancedPost.summary}</Typography>
-                                        )}
-                                        
-                                        <Typography variant="subtitle2" color="primary">Additional Information</Typography>
-                                        {isEditingEnhanced ? (
-                                            <TextField
-                                                fullWidth
-                                                multiline
-                                                rows={2}
-                                                value={aiEnhancedPost.additionalInfo}
-                                                onChange={(e) => setAiEnhancedPost({...aiEnhancedPost, additionalInfo: e.target.value})}
-                                                sx={{ mb: 2 }}
-                                            />
-                                        ) : (
-                                            <Typography>{aiEnhancedPost.additionalInfo}</Typography>
+                                            <Typography paragraph>{aiEnhancedPost.content}</Typography>
                                         )}
                                     </>
                                 ) : (
@@ -430,7 +569,7 @@ const CreatePost = () => {
                                             <Typography paragraph>{location}</Typography>
                                         )}
                                         
-                                        <Typography variant="subtitle2" color="primary">Details</Typography>
+                                        <Typography variant="subtitle2" color="primary">Content</Typography>
                                         {isEditingEnhanced ? (
                                             <TextField
                                                 fullWidth

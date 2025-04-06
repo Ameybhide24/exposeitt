@@ -164,4 +164,31 @@ router.patch('/:id/status', checkJwt, async (req, res) => {
     }
 });
 
+// Report post to authorities
+router.patch('/:id/report-to-authorities', checkJwt, async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Verify that the user is the owner of the post
+        if (post.userId !== req.auth?.payload?.sub) {
+            return res.status(403).json({ message: 'Not authorized to report this post' });
+        }
+
+        // Update the post status to reported
+        post.status = 'reported';
+        const updatedPost = await post.save();
+        
+        res.json({
+            message: 'Post has been reported to authorities',
+            post: updatedPost
+        });
+    } catch (err) {
+        console.error('Error reporting post to authorities:', err);
+        res.status(500).json({ message: 'Failed to report post to authorities' });
+    }
+});
+
 module.exports = router; 

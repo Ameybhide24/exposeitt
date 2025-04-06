@@ -47,6 +47,48 @@ const Dashboard = () => {
         fetchUserPosts();
     }, [getAccessTokenSilently]);
 
+    const handleReportToAuthorities = async (postId) => {
+        try {
+            const token = await getAccessTokenSilently();
+            console.log('Attempting to report post:', postId);
+            
+            const response = await axios.patch(
+                `http://localhost:5050/api/posts/${postId}/report-to-authorities`,
+                { status: 'reported' },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                }
+            );
+
+            console.log('Report response:', response.data);
+
+            // Update the local state to reflect the change
+            setPosts(posts.map(post => 
+                post._id === postId 
+                    ? { ...post, status: 'reported' }
+                    : post
+            ));
+
+            // Clear any existing error
+            setError('');
+        } catch (err) {
+            console.error('Error reporting to authorities:', {
+                message: err.message,
+                response: err.response?.data,
+                status: err.response?.status
+            });
+            
+            // Set a more specific error message
+            setError(
+                err.response?.data?.message || 
+                'Failed to report to authorities. Please try again later.'
+            );
+        }
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'posted':
@@ -148,10 +190,7 @@ const Dashboard = () => {
                                                             size="small"
                                                             color="error"
                                                             variant="outlined"
-                                                            onClick={() => {
-                                                                // TODO: Implement report to authorities
-                                                                console.log('Report to authorities:', post._id);
-                                                            }}
+                                                            onClick={() => handleReportToAuthorities(post._id)}
                                                         >
                                                             Report to Authorities
                                                         </Button>
