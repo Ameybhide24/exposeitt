@@ -50,23 +50,42 @@ router.get('/feed', async (req, res) => {
 
         console.log(`Found ${posts.length} posts for feed`);
 
-        // Anonymize user data
-        const anonymizedPosts = posts.map(post => {
-            const anonymousId = generateAnonymousId(post.userId);
-            return {
-                ...post.toObject({ getters: true }),
-                authorName: `Anonymous User ${anonymousId}`,
-                authorEmail: undefined, // Remove email for privacy
-                userId: undefined // Remove actual userId for privacy
-            };
-        });
+        const enrichedPosts = await Promise.all(
+            posts.map(async (post) => {
+                const anonymousId = generateAnonymousId(post.userId);
 
-        res.json(anonymizedPosts);
+                // Fetch recent 5 posts from the same user
+                const recentPosts = await Post.find({ userId: post.userId })
+                    .sort({ createdAt: -1 })
+                    .limit(5);
+
+                let upvoteSum = 0;
+                let downvoteSum = 0;
+
+                recentPosts.forEach(p => {
+                    upvoteSum += p.upvotes || 0;
+                    downvoteSum += p.downvotes || 0;
+                });
+
+                const isScammer = downvoteSum > 3 * upvoteSum;
+
+                return {
+                    ...post.toObject({ getters: true }),
+                    authorName: `Anonymous User ${anonymousId}`,
+                    authorEmail: undefined,
+                    userId: undefined,
+                    isScammer
+                };
+            })
+        );
+
+        res.json(enrichedPosts);
     } catch (err) {
         console.error('Error fetching feed:', err);
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // Get all approved posts
 router.get('/', async (req, res) => {

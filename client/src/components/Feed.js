@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+
 import {
     Box,
     Card,
@@ -163,7 +165,7 @@ const Feed = () => {
             const postId = post._id;
         
             try {
-                
+
                 let updatedPost;
         
                 if (direction === 1) {
@@ -287,35 +289,55 @@ const Feed = () => {
                     <Box sx={{ flex: 1, pl: 3 }}>
                         {/* Post Header */}
                         <Box sx={{ mb: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                                <Avatar 
-                                    sx={{ 
-                                        width: 32, 
-                                        height: 32, 
-                                        bgcolor: avatarColor,
-                                        fontSize: '1rem'
-                                    }}
-                                >
-                                    {post.authorName.charAt(0)}
-                                </Avatar>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    {post.authorName} • {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-                                </Typography>
-                                <Chip 
-                                    label={post.category}
-                                    size="small"
-                                    sx={{ 
-                                        height: '24px',
-                                        fontSize: '0.875rem',
-                                        backgroundColor: `${getRandomColor(post.category)}20`,
-                                        color: getRandomColor(post.category),
-                                        fontWeight: 600,
-                                        '&:hover': {
-                                            backgroundColor: `${getRandomColor(post.category)}30`,
-                                        }
-                                    }}
-                                />
-                            </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+    <Avatar 
+        sx={{ 
+            width: 32, 
+            height: 32, 
+            bgcolor: avatarColor,
+            fontSize: '1rem'
+        }}
+    >
+        {post.authorName.charAt(0)}
+    </Avatar>
+    
+    <Typography variant="subtitle2" color="text.secondary">
+        {post.authorName} • {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+    </Typography>
+
+    {post.isScammer && (
+        <Tooltip title="This user has a high number of downvoted posts. Use caution.">
+            <Chip
+                icon={<WarningAmberIcon />}
+                label="Scammer Risk"
+                color="error"
+                size="small"
+                sx={{
+                    fontWeight: 600,
+                    backgroundColor: '#fdecea',
+                    color: '#b71c1c',
+                    borderRadius: 2
+                }}
+            />
+        </Tooltip>
+    )}
+
+    <Chip 
+        label={post.category}
+        size="small"
+        sx={{ 
+            height: '24px',
+            fontSize: '0.875rem',
+            backgroundColor: `${getRandomColor(post.category)}20`,
+            color: getRandomColor(post.category),
+            fontWeight: 600,
+            '&:hover': {
+                backgroundColor: `${getRandomColor(post.category)}30`,
+            }
+        }}
+    />
+</Box>
+
                             <Typography variant="h5" sx={{ fontSize: '1.25rem', fontWeight: 700, mb: 1 }}>
                                 {post.title}
                             </Typography>
