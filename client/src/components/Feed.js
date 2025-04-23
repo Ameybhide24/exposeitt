@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { useAuth0 } from '@auth0/auth0-react';
 import {
     Box,
     Card,
@@ -32,7 +33,11 @@ import {
     DialogContent,
     DialogActions,
     Switch,
-    FormControlLabel
+    FormControlLabel,
+    List,
+    ListItem,
+    ListItemAvatar,
+    ListItemText
 } from '@mui/material';
 import { formatDistanceToNow } from 'date-fns';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -53,9 +58,12 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import { motion, AnimatePresence } from 'framer-motion';
+import ChatBubbleIcon from '@mui/icons-material/ChatBubble';
+import SendIcon from '@mui/icons-material/Send';
 
 const MotionCard = motion(Card);
 const MotionContainer = motion(Container);
+const MotionBox = motion(Box);
 
 const Feed = () => {
     const [posts, setPosts] = useState([]);
@@ -71,6 +79,7 @@ const Feed = () => {
     const [viewMode, setViewMode] = useState('card'); // 'card' or 'compact'
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const { getAccessTokenSilently } = useAuth0();
 
     const fetchPosts = async () => {
         try {
@@ -158,6 +167,12 @@ const Feed = () => {
             case 'newest':
                 result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 break;
+            case 'oldest':
+                result.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                break;
+            case 'upvotes':
+                result.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
+                break;
             default:
                 break;
         }
@@ -166,13 +181,18 @@ const Feed = () => {
     }, [posts, searchTerm, sortBy]);
 
     const PostCard = ({ post }) => {
-
         const [userVote, setUserVote] = useState(null);
         const [menuAnchorEl, setMenuAnchorEl] = useState(null);
         const isSaved = savedPosts.has(post._id);
         const [imageError, setImageError] = useState(false);
         const [upvotes, setUpvotes] = useState(post.upvotes || 0);
         const [downvotes, setDownvotes] = useState(post.downvotes || 0);
+        const [commentsOpen, setCommentsOpen] = useState(false);
+        const [comments, setComments] = useState([]);
+        const [newComment, setNewComment] = useState('');
+        const [loadingComments, setLoadingComments] = useState(false);
+        const [commentError, setCommentError] = useState(null);
+        
         // Log media info when post is rendered
         useEffect(() => {
             if (post.media && post.media.length > 0) {
@@ -205,8 +225,6 @@ const Feed = () => {
             }
         };
         
-        
-
         const handleMenuClick = (event) => {
             setMenuAnchorEl(event.currentTarget);
         };
@@ -258,6 +276,83 @@ const Feed = () => {
             
             // Otherwise construct the full URL
             return `${serverBaseUrl}/api/posts/media/${mediaPath}`;
+        };
+
+        const fetchComments = async () => {
+            try {
+                setLoadingComments(true);
+                setCommentError(null);
+                const response = await axios.get(`http://localhost:5050/api/posts/${post._id}/comments`);
+                setComments(response.data);
+                setLoadingComments(false);
+            } catch (err) {
+                console.error('Error fetching comments:', err);
+                setCommentError('Failed to load comments. Please try again.');
+                setLoadingComments(false);
+            }
+        };
+
+        const handleCommentsOpen = () => {
+            if (!commentsOpen) {
+                fetchComments();
+            }
+            setCommentsOpen(!commentsOpen);
+        };
+
+        const handleCommentSubmit = async () => {
+            if (!newComment.trim()) return;
+            
+            try {
+                // Get user info from Auth0
+                const domain = process.env.REACT_APP_AUTH0_DOMAIN;
+                const audience = process.env.REACT_APP_AUTH0_AUDIENCE;
+                const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
+                const accessToken = await getAccessTokenSilently({
+                    authorizationParams: {
+                        audience: audience,
+                        scope: "openid profile email"
+                    }
+                });
+                
+                // Get user profile
+                const userDetailResponse = await axios.get(
+                    `https://${domain}/userinfo`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`
+                        }
+                    }
+                );
+                
+                const userData = userDetailResponse.data;
+                
+                // Save the comment locally first
+                const commentText = newComment;
+                setNewComment(''); // Clear input field immediately
+                
+                // Post comment
+                const commentData = {
+                    text: commentText,
+                    authorName: userData.name || userData.nickname,
+                    authorEmail: userData.email
+                };
+                
+                const response = await axios.post(
+                    `http://localhost:5050/api/posts/${post._id}/comments`,
+                    commentData,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`
+                        }
+                    }
+                );
+                
+                // Add new comment to the comments array
+                setComments(prevComments => [response.data, ...prevComments]);
+            } catch (err) {
+                console.error('Error posting comment:', err);
+                alert('Failed to post comment. Please try again.');
+            }
         };
 
         return (
@@ -640,12 +735,13 @@ const Feed = () => {
                             pt: 2,
                             mt: 2
                         }}>
-                            <Tooltip title="Comment on this post" arrow>
+                            <Tooltip title={commentsOpen ? "Hide comments" : "Show comments"} arrow>
                                 <Button
-                                    startIcon={<ChatBubbleOutlineIcon />}
+                                    startIcon={comments.length > 0 ? <ChatBubbleIcon /> : <ChatBubbleOutlineIcon />}
                                     size="medium"
+                                    onClick={handleCommentsOpen}
                                     sx={{ 
-                                        color: 'text.secondary',
+                                        color: commentsOpen ? 'primary.main' : 'text.secondary',
                                         textTransform: 'none',
                                         '&:hover': { 
                                             backgroundColor: 'action.hover',
@@ -655,7 +751,7 @@ const Feed = () => {
                                         transition: 'all 0.2s ease-in-out'
                                     }}
                                 >
-                                    Comments
+                                    {comments.length > 0 ? `Comments (${comments.length})` : 'Comments'}
                                 </Button>
                             </Tooltip>
                             <Tooltip title="Share this post" arrow>
@@ -711,6 +807,128 @@ const Feed = () => {
                         </Box>
                     </Box>
                 </Box>
+                
+                {/* Comment Dropdown Section - replaces the Dialog */}
+                <AnimatePresence initial={false}>
+                    {commentsOpen && (
+                        <MotionBox
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            sx={{ 
+                                overflow: 'hidden',
+                                borderTop: '1px solid rgba(0,0,0,0.1)',
+                                backgroundColor: 'rgba(0,0,0,0.01)'
+                            }}
+                        >
+                            <Box sx={{ p: 3 }}>
+                                {/* New Comment Input */}
+                                <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+                                    <Avatar sx={{ bgcolor: getRandomColor(post.authorName) }}>
+                                        {post.authorName.charAt(0).toUpperCase()}
+                                    </Avatar>
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <TextField
+                                            fullWidth
+                                            variant="outlined"
+                                            placeholder="Write a comment..."
+                                            multiline
+                                            rows={2}
+                                            value={newComment}
+                                            onChange={(e) => setNewComment(e.target.value)}
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton 
+                                                            onClick={handleCommentSubmit}
+                                                            disabled={!newComment.trim()}
+                                                            color="primary"
+                                                        >
+                                                            <SendIcon />
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                )
+                                            }}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: 2,
+                                                }
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+
+                                <Divider sx={{ my: 3 }} />
+
+                                {/* Comments List */}
+                                {loadingComments ? (
+                                    <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+                                        <CircularProgress size={32} />
+                                    </Box>
+                                ) : commentError ? (
+                                    <Alert severity="error" sx={{ my: 2 }}>{commentError}</Alert>
+                                ) : comments.length === 0 ? (
+                                    <Box sx={{ py: 4, textAlign: 'center' }}>
+                                        <Typography color="text.secondary">
+                                            No comments yet. Be the first to comment!
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
+                                        {comments.map((comment) => (
+                                            <ListItem
+                                                key={comment._id}
+                                                alignItems="flex-start"
+                                                sx={{ 
+                                                    py: 2,
+                                                    px: 1,
+                                                    '&:hover': { 
+                                                        backgroundColor: 'rgba(0,0,0,0.03)',
+                                                        borderRadius: 2
+                                                    }
+                                                }}
+                                            >
+                                                <ListItemAvatar>
+                                                    <Avatar sx={{ bgcolor: getRandomColor(comment.authorName) }}>
+                                                        {comment.authorName.charAt(0).toUpperCase()}
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <ListItemText
+                                                    primary={
+                                                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                                            {comment.authorName}
+                                                        </Typography>
+                                                    }
+                                                    secondary={
+                                                        <>
+                                                            <Typography
+                                                                component="span"
+                                                                variant="body2"
+                                                                color="text.primary"
+                                                                sx={{ display: 'block', mb: 1 }}
+                                                            >
+                                                                {comment.text}
+                                                            </Typography>
+                                                            <Typography
+                                                                component="span"
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                            >
+                                                                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                                                            </Typography>
+                                                        </>
+                                                    }
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                )}
+                            </Box>
+                        </MotionBox>
+                    )}
+                </AnimatePresence>
+
                 <Menu
                     anchorEl={menuAnchorEl}
                     open={Boolean(menuAnchorEl)}
@@ -856,7 +1074,15 @@ const Feed = () => {
                                     }
                                 }}
                             >
-                                Sort By
+                                Sort: {sortBy === 'newest' 
+                                        ? 'Newest' 
+                                        : sortBy === 'oldest'
+                                        ? 'Oldest'
+                                        : sortBy === 'trending' 
+                                        ? 'Trending' 
+                                        : sortBy === 'upvotes'
+                                        ? 'Most Upvoted'
+                                        : 'Newest'}
                             </Button>
                             <Button
                                 startIcon={<RefreshIcon />}
@@ -878,6 +1104,83 @@ const Feed = () => {
                         </Box>
                     </Box>
                 </Box>
+
+                {/* Sort Menu */}
+                <Menu
+                    anchorEl={filterAnchorEl}
+                    open={Boolean(filterAnchorEl)}
+                    onClose={handleFilterClose}
+                    TransitionComponent={Fade}
+                    PaperProps={{
+                        sx: { 
+                            width: '200px',
+                            borderRadius: 2,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                            mt: 1
+                        }
+                    }}
+                >
+                    <Typography sx={{ px: 2, py: 1, color: 'text.secondary', fontWeight: 600 }}>
+                        Sort Posts By
+                    </Typography>
+                    <Divider sx={{ mb: 1 }} />
+                    <MenuItem 
+                        onClick={() => handleSortChange('newest')}
+                        sx={{ 
+                            py: 1.5,
+                            borderLeft: sortBy === 'newest' ? '4px solid #1a237e' : '4px solid transparent',
+                            backgroundColor: sortBy === 'newest' ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' }
+                        }}
+                    >
+                        <NewReleasesIcon sx={{ mr: 2, color: sortBy === 'newest' ? 'primary.main' : 'text.secondary' }} />
+                        <Typography sx={{ fontWeight: sortBy === 'newest' ? 600 : 400 }}>
+                            Newest First
+                        </Typography>
+                    </MenuItem>
+                    <MenuItem 
+                        onClick={() => handleSortChange('oldest')}
+                        sx={{ 
+                            py: 1.5,
+                            borderLeft: sortBy === 'oldest' ? '4px solid #1a237e' : '4px solid transparent',
+                            backgroundColor: sortBy === 'oldest' ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' }
+                        }}
+                    >
+                        <NewReleasesIcon sx={{ mr: 2, color: sortBy === 'oldest' ? 'primary.main' : 'text.secondary', transform: 'rotate(180deg)' }} />
+                        <Typography sx={{ fontWeight: sortBy === 'oldest' ? 600 : 400 }}>
+                            Oldest First
+                        </Typography>
+                    </MenuItem>
+                    <MenuItem 
+                        onClick={() => handleSortChange('trending')}
+                        sx={{ 
+                            py: 1.5,
+                            borderLeft: sortBy === 'trending' ? '4px solid #1a237e' : '4px solid transparent',
+                            backgroundColor: sortBy === 'trending' ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' }
+                        }}
+                    >
+                        <TrendingUpIcon sx={{ mr: 2, color: sortBy === 'trending' ? 'primary.main' : 'text.secondary' }} />
+                        <Typography sx={{ fontWeight: sortBy === 'trending' ? 600 : 400 }}>
+                            Trending
+                        </Typography>
+                    </MenuItem>
+                    <MenuItem 
+                        onClick={() => handleSortChange('upvotes')}
+                        sx={{ 
+                            py: 1.5,
+                            borderLeft: sortBy === 'upvotes' ? '4px solid #1a237e' : '4px solid transparent',
+                            backgroundColor: sortBy === 'upvotes' ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
+                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' }
+                        }}
+                    >
+                        <ArrowUpwardIcon sx={{ mr: 2, color: sortBy === 'upvotes' ? 'primary.main' : 'text.secondary' }} />
+                        <Typography sx={{ fontWeight: sortBy === 'upvotes' ? 600 : 400 }}>
+                            Most Upvoted
+                        </Typography>
+                    </MenuItem>
+                </Menu>
 
                 {/* Tabs and View Mode */}
                 <Box sx={{ 
@@ -941,7 +1244,7 @@ const Feed = () => {
 
                 {/* Main Content */}
                 <Grid container spacing={4}>
-                    <Grid item xs={12} md={8}>
+                    <Grid item xs={12}>
                         <AnimatePresence>
                             {filteredAndSortedPosts.length === 0 ? (
                                 <Alert 
@@ -968,42 +1271,186 @@ const Feed = () => {
                             )}
                         </AnimatePresence>
                     </Grid>
-                    
-                    {!isMobile && (
-                        <Grid item md={4}>
-                            <Paper 
-                                sx={{ 
-                                    p: 3, 
-                                    borderRadius: 3,
-                                    position: 'sticky',
-                                    top: 24,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                    backdropFilter: 'blur(10px)'
-                                }}
-                                elevation={0}
-                            >
-                                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+                </Grid>
+                
+                {/* Community Guidelines Section */}
+                {!isMobile && (
+                    <Box sx={{ mt: 4 }}>
+                        <Paper 
+                            sx={{ 
+                                p: 3, 
+                                borderRadius: 3,
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                backdropFilter: 'blur(10px)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)'
+                            }}
+                            elevation={0}
+                        >
+                            <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 1.5, 
+                                mb: 2.5 
+                            }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a237e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <Typography 
+                                    variant="h6" 
+                                    sx={{ 
+                                        fontWeight: 700,
+                                        color: '#1a237e',
+                                    }}
+                                >
                                     Community Guidelines
                                 </Typography>
-                                <Divider sx={{ mb: 3 }} />
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    <Typography variant="body1" color="text.secondary">
-                                        1. Be respectful and constructive
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary">
-                                        2. Protect personal information
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary">
-                                        3. Report inappropriate content
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary">
-                                        4. Verify information before sharing
-                                    </Typography>
-                                </Box>
-                            </Paper>
-                        </Grid>
-                    )}
-                </Grid>
+                            </Box>
+                            <Divider sx={{ mb: 3 }} />
+
+                            {/* Guidelines Items - Two per row layout that matches the screenshot */}
+                            <Grid container spacing={3}>
+                                {/* First column */}
+                                <Grid item xs={12} sm={6}>
+                                    {/* Item 1: Be respectful and constructive */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+                                        <Box sx={{ 
+                                            backgroundColor: 'rgba(26, 35, 126, 0.1)', 
+                                            borderRadius: '50%',
+                                            minWidth: 40,
+                                            height: 40,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            color: '#1a237e'
+                                        }}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="9" cy="7" r="4"></circle>
+                                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                            </svg>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                Be respectful and constructive
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Treat others with kindness and share information that helps the community.
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Item 3: Report inappropriate content */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                                        <Box sx={{ 
+                                            backgroundColor: 'rgba(26, 35, 126, 0.1)', 
+                                            borderRadius: '50%', 
+                                            minWidth: 40,
+                                            height: 40,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            color: '#1a237e'
+                                        }}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                                                <line x1="4" y1="22" x2="4" y2="15"></line>
+                                            </svg>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                Report inappropriate content
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Flag harmful, illegal, or misleading posts to maintain safety.
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Grid>
+
+                                {/* Second column */}
+                                <Grid item xs={12} sm={6}>
+                                    {/* Item 2: Protect personal information */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+                                        <Box sx={{ 
+                                            backgroundColor: 'rgba(26, 35, 126, 0.1)', 
+                                            borderRadius: '50%', 
+                                            minWidth: 40,
+                                            height: 40,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            color: '#1a237e'
+                                        }}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                            </svg>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                Protect personal information
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Never share private details that could identify or harm others.
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Item 4: Verify information before sharing */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                                        <Box sx={{ 
+                                            backgroundColor: 'rgba(26, 35, 126, 0.1)', 
+                                            borderRadius: '50%', 
+                                            minWidth: 40,
+                                            height: 40,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            color: '#1a237e'
+                                        }}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="9 11 12 14 22 4"></polyline>
+                                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                            </svg>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                                Verify information before sharing
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Check facts to avoid spreading misinformation in the community.
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Grid>
+                            </Grid>
+                            
+                            <Box sx={{ 
+                                mt: 3, 
+                                pt: 2, 
+                                borderTop: '1px solid rgba(0,0,0,0.08)',
+                                display: 'flex',
+                                justifyContent: 'center'
+                            }}>
+                                <Button 
+                                    variant="outlined" 
+                                    size="small"
+                                    sx={{ 
+                                        borderRadius: 2,
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        px: 2
+                                    }}
+                                >
+                                    View Full Guidelines
+                                </Button>
+                            </Box>
+                        </Paper>
+                    </Box>
+                )}
             </MotionContainer>
 
             {/* Report Dialog */}

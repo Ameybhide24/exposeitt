@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
+const Comment = require('../models/Comment');
 const { auth } = require('express-oauth2-jwt-bearer');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -536,6 +537,99 @@ router.get('/media/:filename', (req, res) => {
     } catch (error) {
         console.error(`Error serving media file:`, error);
         res.status(500).send('Server error when accessing media file');
+    }
+});
+
+// Get comments for a specific post
+router.get('/:postId/comments', async (req, res) => {
+    try {
+        const { postId } = req.params;
+        
+        // Verify post exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+        
+        const comments = await Comment.find({ postId }).sort({ createdAt: -1 });
+        
+        // Anonymize user data similar to feed posts
+        const enrichedComments = comments.map(comment => {
+            const userId = comment.userId.toString();
+            const commentObj = comment.toObject({ getters: true });
+            
+            // If already mapped, reuse the same anonymous name
+            if (!userAnonMap.has(userId)) {
+                const randomName = getRandomName();
+                const randomNumber = getRandomNumber();
+                const anonymousName = `${randomName}-${randomNumber}`;
+                userAnonMap.set(userId, anonymousName);
+            }
+            
+            const authorName = userAnonMap.get(userId);
+            
+            return {
+                ...commentObj,
+                authorName,
+                authorEmail: undefined,
+                userId: undefined
+            };
+        });
+        
+        res.json(enrichedComments);
+    } catch (err) {
+        console.error('Error fetching comments:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Add a comment to a post
+router.post('/:postId/comments', checkJwt, async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { text, authorName, authorEmail } = req.body;
+        const userId = req.auth?.payload?.sub;
+        
+        // Verify post exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+        
+        const newComment = new Comment({
+            text,
+            postId,
+            userId,
+            authorName,
+            authorEmail
+        });
+        
+        const savedComment = await newComment.save();
+        
+        // Return anonymized version of the comment
+        const userId_string = savedComment.userId.toString();
+        
+        // If already mapped, reuse the same anonymous name
+        if (!userAnonMap.has(userId_string)) {
+            const randomName = getRandomName();
+            const randomNumber = getRandomNumber();
+            const anonymousName = `${randomName}-${randomNumber}`;
+            userAnonMap.set(userId_string, anonymousName);
+        }
+        
+        const authorName_anon = userAnonMap.get(userId_string);
+        
+        const commentObj = savedComment.toObject({ getters: true });
+        
+        res.status(201).json({
+            ...commentObj,
+            authorName: authorName_anon,
+            authorEmail: undefined,
+            userId: undefined
+        });
+    } catch (err) {
+        console.error('Error creating comment:', err);
+        res.status(500).json({ message: err.message });
     }
 });
 
