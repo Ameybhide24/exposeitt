@@ -40,7 +40,7 @@ jobs:
         docker build -t ${{ secrets.DOCKER_USERNAME }}/exposeitt-server:latest .
 
     - name: Build gemintegrate image
-      working-directory: ./gemintegrate
+      working-directory: ./GemIntegrate
       run: |
         docker build -t ${{ secrets.DOCKER_USERNAME }}/exposeitt-gemintegrate:latest .
 
