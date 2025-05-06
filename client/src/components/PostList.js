@@ -16,11 +16,12 @@ const PostList = () => {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const baseURL = process.env.REACT_APP_API_URL;
 
     useEffect(() => {
         const fetchPosts = async () => {
             try {
-                const response = await axios.get('http://localhost:5050/api/posts');
+                const response = await axios.get(`${baseURL}/api/posts`);
                 setPosts(response.data);
                 setLoading(false);
             } catch (err) {

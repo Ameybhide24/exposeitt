@@ -5,17 +5,31 @@ services:
     ports:
       - "3000:80"
     restart: always
+    env_file:
+      - ./client/.env
+    networks:
+      - app-network
 
   server:
     build: ./server
     ports:
-      - "5000:5000"
+      - "5050:5050"
     restart: always
-    environment:
-      - MONGO_URI=<your-mongodb-uri>
+    env_file:
+      - ./server/.env
+    networks:
+      - app-network
 
   genintegrate:
-    build: ./genintegrate
+    build: ./GemIntegrate
     ports:
-      - "6000:6000"
+      - "9000:9000"
     restart: always
+    env_file:
+      - ./GemIntegrate/.env
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

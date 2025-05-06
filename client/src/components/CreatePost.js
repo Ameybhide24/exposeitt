@@ -80,6 +80,8 @@ const CreatePost = () => {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
+    const baseURL = process.env.REACT_APP_API_URL;
+
 
     const handleNext = () => {
         if (activeStep === 0 && (!category || !title || !location)) {
@@ -240,7 +242,7 @@ const CreatePost = () => {
 
             const token = await getAccessTokenSilently();
             const response = await axios.post(
-                'http://localhost:5050/api/posts/upload-media',
+                `${baseURL}/api/posts/upload-media`,
                 formData,
                 {
                     headers: {
@@ -336,7 +338,7 @@ const CreatePost = () => {
 
             // First ensure user exists in database
             await axios.post(
-                'http://localhost:5050/api/users',
+                `${baseURL}/api/users`,
                 {
                     email: user.email,
                     name: user.name,
@@ -405,7 +407,7 @@ const CreatePost = () => {
             }
             // Submit the post
             const response = await axios.post(
-                'http://localhost:5050/api/posts',
+                `${baseURL}/api/posts`,
                 postData,
                 {
                     headers: {
@@ -659,7 +661,7 @@ const CreatePost = () => {
                                                         <Box
                                                             component="img"
                                                             src={mediaFiles[index]?.url 
-                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                ? `${baseURL}/api/posts/media/${mediaFiles[index].url}` 
                                                                 : preview.dataUrl}
                                                             alt={`Uploaded image ${index + 1}`}
                                                             sx={{
@@ -674,7 +676,7 @@ const CreatePost = () => {
                                                         <Box
                                                             component="video"
                                                             src={mediaFiles[index]?.url 
-                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                ? `${baseURL}/api/posts/media/${mediaFiles[index].url}` 
                                                                 : preview.dataUrl}
                                                             controls
                                                             sx={{
@@ -771,7 +773,7 @@ const CreatePost = () => {
                                                         <Box
                                                             component="img"
                                                             src={mediaFiles[index]?.url 
-                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                ? `${baseURL}/api/posts/media/${mediaFiles[index].url}` 
                                                                 : preview.dataUrl}
                                                             alt={`Uploaded image ${index + 1}`}
                                                             sx={{
@@ -786,7 +788,7 @@ const CreatePost = () => {
                                                         <Box
                                                             component="video"
                                                             src={mediaFiles[index]?.url 
-                                                                ? `http://localhost:5050/api/posts/media/${mediaFiles[index].url}` 
+                                                                ? `${baseURL}/api/posts/media/${mediaFiles[index].url}` 
                                                                 : preview.dataUrl}
                                                             controls
                                                             sx={{

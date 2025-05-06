@@ -6,6 +6,6 @@ COPY . .
 
 RUN npm install
 
-EXPOSE 6000
+EXPOSE 9000
 
-CMD ["node", "index.js"]
+CMD ["node", "app.js"]

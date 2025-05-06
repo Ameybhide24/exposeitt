@@ -80,13 +80,15 @@ const Feed = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const { getAccessTokenSilently } = useAuth0();
+    const baseURL = process.env.REACT_APP_API_URL;
+
 
     const fetchPosts = async () => {
         try {
             setLoading(true);
             setError(null);
             console.log('Fetching posts from feed...');
-            const response = await axios.get('http://localhost:5050/api/posts/feed');
+            const response = await axios.get(`${baseURL}/api/posts/feed`);
             console.log('Received posts:', response.data);
             
             // Log media information for debugging
@@ -210,10 +212,10 @@ const Feed = () => {
                 let updatedPost;
         
                 if (direction === 1) {
-                    const res = await axios.post(`http://localhost:5050/api/posts/upvote/${postId}`);
+                    const res = await axios.post(`${baseURL}/api/posts/upvote/${postId}`);
                     updatedPost = res.data;
                 } else if (direction === -1) {
-                    const res = await axios.post(`http://localhost:5050/api/posts/downvote/${postId}`);
+                    const res = await axios.post(`${baseURL}/api/posts/downvote/${postId}`);
                     updatedPost = res.data;
                 }
         
@@ -262,7 +264,7 @@ const Feed = () => {
             if (!mediaPath) return null;
             
             // Ensure we're using the correct server URL
-            const serverBaseUrl = 'http://localhost:5050';
+            const serverBaseUrl = baseURL;
             
             // Check if the URL already has http/https
             if (mediaPath.startsWith('http')) {
@@ -282,7 +284,7 @@ const Feed = () => {
             try {
                 setLoadingComments(true);
                 setCommentError(null);
-                const response = await axios.get(`http://localhost:5050/api/posts/${post._id}/comments`);
+                const response = await axios.get(`${baseURL}/api/posts/${post._id}/comments`);
                 setComments(response.data);
                 setLoadingComments(false);
             } catch (err) {
@@ -338,7 +340,7 @@ const Feed = () => {
                 };
                 
                 const response = await axios.post(
-                    `http://localhost:5050/api/posts/${post._id}/comments`,
+                    `${baseURL}/api/posts/${post._id}/comments`,
                     commentData,
                     {
                         headers: {

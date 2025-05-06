@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         get: function(email) {
             try {
+                console.log(process.env.ENCRYPTION_KEY);
                 const bytes = CryptoJS.AES.decrypt(email, process.env.ENCRYPTION_KEY);
                 return bytes.toString(CryptoJS.enc.Utf8);
             } catch (err) {
@@ -19,6 +20,7 @@ const userSchema = new mongoose.Schema({
             }
         },
         set: function(email) {
+            console.log(process.env.ENCRYPTION_KEY);
             return CryptoJS.AES.encrypt(email, process.env.ENCRYPTION_KEY).toString();
         }
     },
@@ -27,6 +29,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         get: function(name) {
             try {
+                console.log(process.env.ENCRYPTION_KEY);
                 const bytes = CryptoJS.AES.decrypt(name, process.env.ENCRYPTION_KEY);
                 return bytes.toString(CryptoJS.enc.Utf8);
             } catch (err) {
@@ -34,6 +37,7 @@ const userSchema = new mongoose.Schema({
             }
         },
         set: function(name) {
+            console.log(process.env.ENCRYPTION_KEY);
             return CryptoJS.AES.encrypt(name, process.env.ENCRYPTION_KEY).toString();
         }
     },

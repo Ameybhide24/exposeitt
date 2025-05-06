@@ -4,6 +4,7 @@ const CryptoJS = require('crypto-js');
 const encrypt = (value) => {
     if (!value) return value;
     try {
+        console.log(process.env.ENCRYPTION_KEY);
         return CryptoJS.AES.encrypt(value, process.env.ENCRYPTION_KEY).toString();
     } catch (err) {
         console.error('Encryption error:', err);
@@ -14,6 +15,7 @@ const encrypt = (value) => {
 const decrypt = (value) => {
     if (!value) return value;
     try {
+        console.log(process.env.ENCRYPTION_KEY);
         const bytes = CryptoJS.AES.decrypt(value, process.env.ENCRYPTION_KEY);
         return bytes.toString(CryptoJS.enc.Utf8);
     } catch (err) {

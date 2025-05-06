@@ -26,12 +26,13 @@ const Dashboard = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const { getAccessTokenSilently } = useAuth0();
     const navigate = useNavigate();
+    const baseURL = process.env.REACT_APP_API_URL;
 
     useEffect(() => {
         const fetchUserPosts = async () => {
             try {
                 const token = await getAccessTokenSilently();
-                const response = await axios.get('http://localhost:5050/api/posts/my-posts', {
+                const response = await axios.get(`${baseURL}/api/posts/my-posts`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -53,7 +54,7 @@ const Dashboard = () => {
         try {
             const token = await getAccessTokenSilently();
             const response = await axios.post(
-                `http://localhost:5050/api/posts/${postId}/notify-authorities`,
+                `${baseURL}/api/posts/${postId}/notify-authorities`,
                 {},
                 {
                     headers: {
