@@ -1,7 +1,7 @@
 version: '3'
 services:
   client:
-    image: ameybhide2406/exposeitt-client:latest
+    image: amey12345/exposeitt-client:latest
     ports:
       - "3000:80"
     restart: always
@@ -11,7 +11,7 @@ services:
       - app-network
 
   server:
-    image: ameybhide2406/exposeitt-server:latest
+    image: amey12345/exposeitt-server:latest
     ports:
       - "5050:5050"
     restart: always
@@ -21,7 +21,7 @@ services:
       - app-network
 
   genintegrate:
-    image: ameybhide2406/exposeitt-gemintegrate:latest
+    image: amey12345/exposeitt-gemintegrate:latest
     ports:
       - "9000:9000"
     restart: always
