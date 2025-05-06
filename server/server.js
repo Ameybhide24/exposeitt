@@ -39,6 +39,7 @@ const checkJwt = auth({
 });
 
 // MongoDB connection
+
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
