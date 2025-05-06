@@ -1,0 +1,21 @@
+version: '3'
+services:
+  client:
+    build: ./client
+    ports:
+      - "3000:80"
+    restart: always
+
+  server:
+    build: ./server
+    ports:
+      - "5000:5000"
+    restart: always
+    environment:
+      - MONGO_URI=<your-mongodb-uri>
+
+  genintegrate:
+    build: ./genintegrate
+    ports:
+      - "6000:6000"
+    restart: always
