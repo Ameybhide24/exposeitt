@@ -32,27 +32,27 @@ jobs:
     - name: Build client image
       working-directory: ./client
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/exposeitt-client:latest .
+        docker build -t ameybhide2406@gmail.com/exposeitt-client:latest .
 
     - name: Build server image
       working-directory: ./server
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/exposeitt-server:latest .
+        docker build -t ameybhide2406@gmail.com/exposeitt-server:latest .
 
     - name: Build gemintegrate image
       working-directory: ./gemintegrate
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/exposeitt-gemintegrate:latest .
+        docker build -t ameybhide2406@gmail.com/exposeitt-gemintegrate:latest .
 
     # Push Docker images
     - name: Push client image
       run: |
-        docker push ${{ secrets.DOCKER_USERNAME }}/exposeitt-client:latest
+        docker push ameybhide2406@gmail.com/exposeitt-client:latest
 
     - name: Push server image
       run: |
-        docker push ${{ secrets.DOCKER_USERNAME }}/exposeitt-server:latest
+        docker push ameybhide2406@gmail.com/exposeitt-server:latest
 
     - name: Push gemintegrate image
       run: |
-        docker push ${{ secrets.DOCKER_USERNAME }}/exposeitt-gemintegrate:latest
+        docker push ameybhide2406@gmail.com/exposeitt-gemintegrate:latest
