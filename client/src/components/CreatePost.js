@@ -112,7 +112,7 @@ const CreatePost = () => {
                 location: location,
             };
     
-            const response = await axios.post('http://localhost:9000/api/posts/generate', postData);
+            const response = await axios.post('https://exposeitt.com/gen/api/posts/generate', postData);
             setAiEnhancedPost(response.data.post);
             setIsEditingEnhanced(false);
             setActiveStep(3); // Move to Final Review step
@@ -177,7 +177,7 @@ const CreatePost = () => {
 
             const token = await getAccessTokenSilently();
             const response = await axios.post(
-                'http://localhost:9000/api/posts/transcribe-audio',
+                'https://exposeitt.com/gen/api/posts/transcribe-audio',
                 formData,
                 {
                     headers: {
@@ -391,7 +391,7 @@ const CreatePost = () => {
 
             console.log('Post data before submission:', postData);
             const relevanceAssessment = await axios.post(
-                'http://localhost:9000/api/posts/assess-description',
+                'https://exposeitt.com/gen/api/posts/assess-description',
                 { description: postData.content },
                 {
                     headers: {
